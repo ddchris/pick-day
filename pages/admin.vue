@@ -42,7 +42,38 @@
           </div>
        </div>
 
-       <!-- Debug Info (Temporary for troubleshooting) -->
+       <!-- Group Mapping Tool (Prominent) -->
+       <div class="mb-4 p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
+            <h3 class="font-bold text-teal-700 dark:text-teal-400 mb-2 flex items-center gap-2">
+                <div class="i-carbon-link text-xl"></div>
+                群組 ID 修復與永久連結
+            </h3>
+            <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                如果機器人無法推播，或設定無法保存，請在此同步真實 ID 以取得永久連結。
+            </p>
+            <div class="flex gap-2 mb-3">
+                <input type="text" v-model="manualRealGroupId" placeholder="請輸入 C... 開頭的真實 ID" 
+                    class="flex-1 p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+                />
+                <button @click="handleManualSync" class="bg-teal-600 text-white px-3 py-2 rounded hover:bg-teal-700 text-sm font-bold whitespace-nowrap">
+                    同步並產生連結
+                </button>
+            </div>
+            
+            <div v-if="generatedLink" class="p-3 bg-white dark:bg-gray-800 rounded border border-gray-300 dark:border-gray-600 animate-fade-in">
+                <p class="text-xs text-gray-500 mb-1">✅ 您的永久固定連結 (請複製保存)：</p>
+                <div class="flex items-center gap-2">
+                    <code class="flex-1 text-[10px] sm:text-xs break-all bg-gray-100 dark:bg-gray-900 p-1.5 rounded select-all font-mono">
+                        {{ generatedLink }}
+                    </code>
+                    <button @click="copyLink" class="shrink-0 text-teal-600 hover:text-teal-700 text-sm px-2">
+                        <div class="i-carbon-copy text-lg"></div>
+                    </button>
+                </div>
+            </div>
+       </div>
+
+       <!-- Debug Info (Collapsed) -->
        <div class="px-4 py-2 bg-gray-50 dark:bg-gray-900 rounded-lg text-xs font-mono text-gray-500 mb-4 overflow-x-auto">
            <details>
                <summary class="cursor-pointer hover:text-teal-600 font-bold mb-1 select-none">
@@ -53,17 +84,6 @@
                    <p>ID 格式是否正確: <span :class="isIdValid ? 'text-green-500' : 'text-red-500'">{{ isIdValid ? '正確' : '錯誤 (UUID 36字元或 C/R 33字元)' }}</span></p>
                    <p>Context Type: {{ userStore.debugInfo?.type || 'None' }}</p>
                    <p>Raw Context: <pre class="text-[10px]">{{ JSON.stringify(userStore.debugInfo?.rawContext, null, 2) }}</pre></p>
-                   
-                   <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
-                       <p class="font-bold text-teal-600 mb-1">🔗 群組映射工具 (修復推播)</p>
-                       <p class="text-[9px] mb-2 text-gray-400">如果機器人無法發送訊息，請輸入該群組真正的 LINE ID (C...) 並點擊同步。</p>
-                       <div class="flex gap-2">
-                           <input type="text" v-model="manualRealGroupId" placeholder="請輸入 C 開頭的真實 ID" 
-                               class="flex-1 p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
-                           />
-                           <button @click="handleManualSync" class="bg-teal-600 text-white px-2 py-1 rounded hover:bg-teal-700">同步</button>
-                       </div>
-                   </div>
                </div>
            </details>
        </div>

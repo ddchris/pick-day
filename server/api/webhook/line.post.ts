@@ -63,18 +63,34 @@ export default defineEventHandler(async (event: H3Event) => {
         console.error('[Webhook] Firestore save error:', firestoreError)
       }
 
-      // 6. Welcome Message / Setup Link on 'join'
+      const { messagingApi } = await import('@line/bot-sdk')
+      const client = new messagingApi.MessagingApiClient({ channelAccessToken: config.lineChannelAccessToken })
+
+      // 6. ID Query Command (Helper for Admin)
+      if (webhookEvent.type === 'message' && webhookEvent.message.type === 'text') {
+        const text = webhookEvent.message.text.trim()
+        if (['查詢ID', '/id', 'id', 'ID'].includes(text) && groupId) {
+          await client.replyMessage({
+            replyToken: (webhookEvent as any).replyToken,
+            messages: [{
+              type: 'text',
+              text: `本群組的真實 ID 為：\n\n${groupId}\n\n請複製上方 ID (C開頭) 回到網頁進行同步。`
+            }]
+          })
+          return { status: 'success' }
+        }
+      }
+
+      // 7. Welcome Message / Setup Link on 'join'
       if (webhookEvent.type === 'join' && groupId) {
         try {
-          const { messagingApi } = await import('@line/bot-sdk')
-          const client = new messagingApi.MessagingApiClient({ channelAccessToken: config.lineChannelAccessToken })
           const setupLink = `https://liff.line.me/${config.public.liffId}?groupId=${groupId}`
 
           await client.replyMessage({
             replyToken: (webhookEvent as any).replyToken,
             messages: [{
               type: 'text',
-              text: `感謝邀請！我是挑日子機器人 📅\n\n管理員請點擊下方連結完成初始設定：\n${setupLink}\n\n⚠️ 注意：請務必透過此連結進入，以鎖定群組 ID 並確保設定不隨 Session 遺失。`
+              text: `感謝邀請！我是挑日子機器人 📅\n\n本群組的真實 ID 為：\n${groupId}\n\n管理員請點擊下方連結完成初始設定：\n${setupLink}\n\n⚠️ 注意：請務必透過此連結進入，以鎖定群組 ID 並確保設定不隨 Session 遺失。`
             }]
           })
           console.log('[Webhook] Welcome message sent to', groupId)
