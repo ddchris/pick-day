@@ -14,7 +14,14 @@ export default defineNuxtPlugin((nuxtApp) => {
   // --- EARLY CAPTURE: Grab groupId before LIFF/Nuxt eats it ---
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search)
-    const urlGroupId = params.get('groupId')
+    let urlGroupId = params.get('groupId')
+
+    // Try finding in Hash if missing in Search
+    if (!urlGroupId && window.location.hash.includes('?')) {
+      const hashParams = new URLSearchParams(window.location.hash.split('?')[1])
+      urlGroupId = hashParams.get('groupId')
+    }
+
     // Check if it looks like a stable ID
     if (urlGroupId && (urlGroupId.startsWith('C') || urlGroupId.startsWith('R')) && urlGroupId.length > 30) {
       console.log('[LIFF Plugin] ⚡ Early captured groupId from URL:', urlGroupId)

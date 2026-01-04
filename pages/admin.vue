@@ -54,9 +54,10 @@
                    <p>Context Type: {{ userStore.debugInfo?.type || 'None' }}</p>
                    <p>Raw Context: <pre class="text-[10px]">{{ JSON.stringify(userStore.debugInfo?.rawContext, null, 2) }}</pre></p>
                    <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                       <p class="font-bold text-gray-500">🔍 URL Debug:</p>
-                       <p class="break-all">{{ currentUrl }}</p>
-                       <p class="break-all text-blue-500">Query: {{ JSON.stringify(userStore.debugInfo?.routeQuery) }}</p>
+                       <p class="font-bold text-gray-500">🔍 URL Debug (Detailed):</p>
+                       <p class="text-[10px] break-all mb-1">Full: {{ currentUrl }}</p>
+                       <p class="text-[10px] break-all mb-1">Search/Hash: {{ urlSnippet }}</p>
+                       <p class="break-all text-blue-500">Route Query Keys: {{ Object.keys(userStore.debugInfo?.routeQuery || {}).join(', ') }}</p>
                    </div>
                    
                    <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
@@ -268,6 +269,11 @@ onMounted(() => {
         currentUrl.value = window.location.href
     }
 })
+const urlSnippet = computed(() => {
+    if (typeof window === 'undefined') return 'Server Side'
+    return `Search: ${window.location.search} | Hash: ${window.location.hash}` 
+})
+
 const handleManualSync = async () => {
     if (!manualRealGroupId.value) return
     const idRegex = /^[CR][0-9a-f]{32}$/i
