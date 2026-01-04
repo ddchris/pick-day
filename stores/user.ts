@@ -43,10 +43,16 @@ export const useUserStore = defineStore('user', {
           throw new Error('LIFF ID is missing in config')
         }
 
+        console.log('[LIFF] Initializing with ID:', config.public.liffId)
+        console.log('[LIFF] UserAgent:', navigator.userAgent)
+
         await liff.init({ liffId: config.public.liffId })
+        console.log('[LIFF] Init Success')
 
         this.isInLineClient = liff.isInClient()
         this.isExternalBrowser = !liff.isInClient()
+
+        console.log('[LIFF] isInClient:', this.isInLineClient)
 
         if (!liff.isLoggedIn()) {
           // If in external browser, we might want to login to get profile, 
@@ -108,7 +114,7 @@ export const useUserStore = defineStore('user', {
           if (!id) return false
           // LINE Group IDs start with C, Rooms with R, followed by hash
           // Mock IDs are allowed for dev
-          return /^[CR][0-9a-f]{32}$/.test(id) || id.startsWith('mock-')
+          return /^[CR][0-9a-fA-F]{32}$/i.test(id) || id.startsWith('mock-')
         }
 
         // Set GroupId

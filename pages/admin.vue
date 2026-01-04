@@ -243,7 +243,7 @@ const isAdmin = computed(() => userStore.isAdmin)
 const isIdValid = computed(() => {
     const id = userStore.groupId
     if (!id) return false
-    return /^[CR][0-9a-f]{32}$/.test(id) || id.startsWith('mock-')
+    return /^[CR][0-9a-f]{32}$/i.test(id) || id.startsWith('mock-')
 })
 const saving = ref(false)
 const savingSettings = ref(false) // New state for settings save
