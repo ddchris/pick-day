@@ -340,10 +340,14 @@ const simulateOpenAndNotify = async () => {
         // 1. Set status to OPEN
         devStore.setOverrideStatus('OPEN')
         
-        // 2. Get current month for notification
+        // 2. Get NEXT month for notification (Target)
         const now = new Date()
-        const year = now.getFullYear()
-        const month = now.getMonth() + 1
+        let year = now.getFullYear()
+        let month = now.getMonth() + 2 // Target Next Month
+        if (month > 12) {
+             month = 1
+             year += 1
+        }
         const monthStr = String(month).padStart(2, '0')
         
         // 3. Send LINE notification

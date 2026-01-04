@@ -111,9 +111,9 @@ export const useUserStore = defineStore('user', {
           console.warn('Not in a group context', context)
         }
 
-        // Always try to fetch real Group ID (Webhook mapping) to support Desktop/External Admin
-        // This allows admins to refresh the page on desktop and still get the group ID
-        if (this.profile?.userId) {
+        // Fetch Real Group ID only if we don't have one from LIFF (e.g. External Browser)
+        if (!this.groupId && this.profile?.userId) {
+          console.log('[User Store] No Group ID from LIFF, attempting to fetch from webhook mapping...')
           await this.fetchRealGroupId(this.profile.userId)
         }
 

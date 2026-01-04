@@ -14,7 +14,7 @@
              開放填寫
           </h3>
           <p class="text-sm text-gray-600 dark:text-gray-300">
-             每個月 <span class="font-bold text-teal-600">24號 ~ 30號</span> 開放填寫下個月的日期。
+             每個月 <span class="font-bold text-teal-600">{{ start }}號 ~ {{ end }}號</span> 開放填寫下個月的日期。
              只能選擇週末與國定假日。
           </p>
        </div>
@@ -36,7 +36,7 @@
              結果公佈
           </h3>
           <p class="text-sm text-gray-600 dark:text-gray-300">
-             每月 30 號截止後，系統會統計最多人有空的日期（至少 3 人），並由管理員發布最終活動資訊。
+             每月 {{ end }} 號截止後，系統會統計最多人有空的日期（至少 3 人），並由管理員發布最終活動資訊。
           </p>
        </div>
     </div>
@@ -46,3 +46,28 @@
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { doc, getDoc } from 'firebase/firestore'
+const userStore = useUserStore()
+const start = ref(24)
+const end = ref(30)
+
+onMounted(async () => {
+    if (userStore.groupId) {
+        try {
+             const { db } = useNuxtApp().$firebase
+             const { doc, getDoc } = await import('firebase/firestore')
+             const groupSnap = await getDoc(doc(db, 'groups', userStore.groupId))
+             
+             if (groupSnap.exists()) {
+                 const d = groupSnap.data()
+                 if (d.autoVoteStartDay) start.value = d.autoVoteStartDay
+                 if (d.autoVoteEndDay) end.value = d.autoVoteEndDay
+             }
+        } catch (e) {
+            console.error('[About] Failed to load settings', e)
+        }
+    }
+})
+</script>

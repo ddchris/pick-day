@@ -46,7 +46,7 @@
                   <span>自動排程設定</span>
               </div>
               <button @click="saveGroupSettings" :disabled="savingSettings"
-                  class="text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                  class="text-xs bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
               >
                   <div v-if="savingSettings" class="i-carbon-circle-dash animate-spin"></div>
                   {{ savingSettings ? '儲存中' : '儲存設定' }}
