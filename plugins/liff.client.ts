@@ -11,6 +11,17 @@ export default defineNuxtPlugin((nuxtApp) => {
     return
   }
 
+  // --- EARLY CAPTURE: Grab groupId before LIFF/Nuxt eats it ---
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search)
+    const urlGroupId = params.get('groupId')
+    // Check if it looks like a stable ID
+    if (urlGroupId && (urlGroupId.startsWith('C') || urlGroupId.startsWith('R')) && urlGroupId.length > 30) {
+      console.log('[LIFF Plugin] ⚡ Early captured groupId from URL:', urlGroupId)
+      localStorage.setItem('stableGroupId', urlGroupId)
+    }
+  }
+
   // Early initialization
   // Note: We don't await here because we don't want to block the whole app,
   // but stores will await userStore.initLiff() which will wait for this?
