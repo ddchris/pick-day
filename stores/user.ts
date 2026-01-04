@@ -103,39 +103,49 @@ export const useUserStore = defineStore('user', {
           return /^([CR][0-9a-fA-F]{32}|[0-9a-fA-F-]{36})$/i.test(id) || id.startsWith('mock-')
         }
 
-        // Set GroupId
-        let detectedId: string | null = null
-        if (context?.type === 'group' || context?.type === 'room') {
-          detectedId = context.groupId || context.roomId || null
+        // --- ID DETECTION LOGIC (Strict Priority) ---
+        const qId = route.query.groupId as string
+        const cId = context?.groupId || context?.roomId || null
+
+        const isStable = (id: string | null) => !!id && /^[CR][0-9a-fA-F]{32}$/i.test(id)
+
+        let finalId: string | null = null
+
+        // 1. Highest Priority: Stable ID from URL (provided by Bot)
+        if (isStable(qId)) {
+          finalId = qId
+          console.log('[User Store] ✅ Using Stable Group ID from URL:', finalId)
+        }
+        // 2. Second Priority: Stable ID from Native Context
+        else if (isStable(cId)) {
+          finalId = cId
+          console.log('[User Store] ✅ Using Stable Group ID from Native Context:', finalId)
+        }
+        // 3. Third Priority: Unstable UUID from Context (Last Resort)
+        else if (isValidGroupId(cId)) {
+          finalId = cId
+          console.log('[User Store] ⚠️ Using Potentially Unstable UUID from Context:', finalId)
+        }
+        // 4. Fallback: Any valid format from URL
+        else if (isValidGroupId(qId)) {
+          finalId = qId
+          console.log('[User Store] ⚠️ Using ID from URL Fallback:', finalId)
         }
 
-        if (detectedId && isValidGroupId(detectedId)) {
-          this.groupId = detectedId
-          console.log('[User Store] ✅ Valid Group/Room ID set:', this.groupId)
-        } else if (detectedId) {
-          console.warn('[User Store] ❌ Detected ID format invalid:', detectedId)
-        } else {
-          console.warn('[User Store] ⚠️ No Group/Room ID in context. Context Type:', context?.type)
-        }
-
-        // URL Fallback (Highest Priority for specific links)
-        if (!this.groupId) {
-          const qId = route.query.groupId as string
-          if (qId && isValidGroupId(qId)) {
-            this.groupId = qId
-            console.log('[User Store] ✅ Group ID set from valid URL Query:', this.groupId)
-          }
-        }
+        this.groupId = finalId
 
         // --- ID MAPPING SYNC ---
-        // If we have both a UUID from context AND a real ID from URL, sync them!
-        const qId = route.query.groupId as string
-        if (detectedId && qId && detectedId !== qId && isValidGroupId(detectedId) && isValidGroupId(qId)) {
-          console.log('[User Store] 🔄 Detected ID mismatch. Syncing UUID -> Real ID mapping...')
+        // If we found a stable ID in URL, but context gave us a UUID, sync them!
+        if (isStable(qId) && cId && cId !== qId && isValidGroupId(cId)) {
+          console.log('[User Store] 🔄 Mismatch found. Syncing temporary UUID -> Stable ID mapping...')
           $fetch('/api/admin/sync-group-mapping', {
             method: 'POST',
-            body: { liffGroupId: detectedId, realGroupId: qId }
+            body: { liffGroupId: cId, realGroupId: qId }
           }).catch(err => console.error('[User Store] Sync Mapping Failed:', err))
+        }
+
+        if (!this.groupId) {
+          console.warn('[User Store] ⚠️ No valid Group ID detected.')
         }
 
         this.idToken = liff.getIDToken()

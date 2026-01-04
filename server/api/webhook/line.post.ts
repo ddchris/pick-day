@@ -48,8 +48,9 @@ export default defineEventHandler(async (event: H3Event) => {
       console.log('[Webhook] User ID:', userId)
       console.log('[Webhook] Group ID:', groupId)
 
-      // 5. Store user-group mapping in Firestore (using admin SDK)
+      // 5. Store user-group mapping in Firestore
       try {
+        const { adminDb } = await import('~/server/utils/firebase')
         await adminDb.collection('userGroupMappings').doc(userId).set({
           userId,
           groupId,
@@ -60,6 +61,26 @@ export default defineEventHandler(async (event: H3Event) => {
         console.log('[Webhook] ✅ Mapping saved to Firestore')
       } catch (firestoreError: any) {
         console.error('[Webhook] Firestore save error:', firestoreError)
+      }
+
+      // 6. Welcome Message / Setup Link on 'join'
+      if (webhookEvent.type === 'join' && groupId) {
+        try {
+          const { messagingApi } = await import('@line/bot-sdk')
+          const client = new messagingApi.MessagingApiClient({ channelAccessToken: config.lineChannelAccessToken })
+          const setupLink = `https://liff.line.me/${config.public.liffId}?groupId=${groupId}`
+
+          await client.replyMessage({
+            replyToken: (webhookEvent as any).replyToken,
+            messages: [{
+              type: 'text',
+              text: `感謝邀請！我是挑日子機器人 📅\n\n管理員請點擊下方連結完成初始設定：\n${setupLink}\n\n⚠️ 注意：請務必透過此連結進入，以鎖定群組 ID 並確保設定不隨 Session 遺失。`
+            }]
+          })
+          console.log('[Webhook] Welcome message sent to', groupId)
+        } catch (e: any) {
+          console.error('[Webhook] Failed to send welcome message:', e)
+        }
       }
     }
 

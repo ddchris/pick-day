@@ -55,7 +55,11 @@
                 <span v-if="userStore.initError" class="text-red-300">Error: {{ userStore.initError }}</span>
             </div>
             <div class="truncate text-teal-300">
-                RawID: {{ userStore.debugInfo?.groupId || userStore.debugInfo?.roomId || 'Missing' }}
+                ActiveID: {{ userStore.groupId || 'Missing' }}
+                <span v-if="userStore.groupId && !/^[CR][0-9a-fA-F]{32}$/i.test(userStore.groupId)" class="text-red-400 text-[8px] animate-pulse"> (⚠️ 臨時 ID)</span>
+            </div>
+            <div class="truncate text-gray-400 opacity-70">
+                RotatingID: {{ userStore.debugInfo?.groupId || userStore.debugInfo?.roomId || 'Missing' }}
             </div>
         </div>
       </div>

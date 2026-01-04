@@ -273,8 +273,11 @@ const handleManualSync = async () => {
             }
         })
         if (res.success) {
-            alert('🚀 同步成功！機器人現在可以正確發送推播到此群組。')
+            // Update the store to the stable ID immediately
+            userStore.groupId = manualRealGroupId.value
+            alert('🚀 同步成功！此頁面已自動鎖定至穩定 ID。現在您可以安全地保存設定，機器人也能正常發送推播了。')
             manualRealGroupId.value = ''
+            // The watcher in admin.vue will automatically fetch data for the new groupId
         }
     } catch (e: any) {
         alert('❌ 同步失敗：' + (e.data?.statusMessage || e.message))
