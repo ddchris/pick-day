@@ -107,7 +107,11 @@ export const useUserStore = defineStore('user', {
         const qId = route.query.groupId as string
         const cId = context?.groupId || context?.roomId || null
 
-        const isStable = (id: string | null) => !!id && /^[CR][0-9a-fA-F]{32}$/i.test(id)
+        // Relaxed Check: Just C/R + length > 30 (to be safe)
+        const isStable = (id: string | null) => !!id && (id.startsWith('C') || id.startsWith('R')) && id.length > 30
+
+        // Check LocalStorage for previously known Stable ID
+        const storedStableId = localStorage.getItem('stableGroupId')
 
         let finalId: string | null = null
 
@@ -115,18 +119,27 @@ export const useUserStore = defineStore('user', {
         if (isStable(qId)) {
           finalId = qId
           console.log('[User Store] ✅ Using Stable Group ID from URL:', finalId)
+          // Persist it!
+          localStorage.setItem('stableGroupId', finalId)
         }
         // 2. Second Priority: Stable ID from Native Context
         else if (isStable(cId)) {
-          finalId = cId
+          finalId = cId!
           console.log('[User Store] ✅ Using Stable Group ID from Native Context:', finalId)
+          // Persist it!
+          localStorage.setItem('stableGroupId', finalId)
         }
-        // 3. Third Priority: Unstable UUID from Context (Last Resort)
+        // 3. Recovery Priority: Previously stored Stable ID (if current context is unstable)
+        else if (storedStableId && isValidGroupId(cId)) { // If we are in *some* group context
+          finalId = storedStableId
+          console.log('[User Store] ♻️ Restored Stable Group ID from Storage:', finalId)
+        }
+        // 4. Third Priority: Unstable UUID from Context (Last Resort)
         else if (isValidGroupId(cId)) {
           finalId = cId
           console.log('[User Store] ⚠️ Using Potentially Unstable UUID from Context:', finalId)
         }
-        // 4. Fallback: Any valid format from URL
+        // 5. Fallback: Any valid format from URL
         else if (isValidGroupId(qId)) {
           finalId = qId
           console.log('[User Store] ⚠️ Using ID from URL Fallback:', finalId)
@@ -134,8 +147,15 @@ export const useUserStore = defineStore('user', {
 
         this.groupId = finalId
 
+        // Update Debug Info
+        this.debugInfo = {
+          ...this.debugInfo,
+          routeQuery: route.query, // <--- Add this for debugging
+          activeIdSource: finalId === qId ? 'URL' : finalId === storedStableId ? 'Storage' : 'Context'
+        }
+
         // --- ID MAPPING SYNC ---
-        // If we found a stable ID in URL, but context gave us a UUID, sync them!
+        // If we have both a UUID from context AND a real ID from URL, sync them!
         if (isStable(qId) && cId && cId !== qId && isValidGroupId(cId)) {
           console.log('[User Store] 🔄 Mismatch found. Syncing temporary UUID -> Stable ID mapping...')
           $fetch('/api/admin/sync-group-mapping', {
