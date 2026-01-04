@@ -270,8 +270,35 @@ const isIdValid = computed(() => {
 const generatedLink = ref('')
 const manualRealGroupId = ref('')
 const currentUrl = ref('')
+const statusMsg = ref('')
 
-onMounted(() => {
+// --- 1. Init: Fetch Latest Group from Server (Single Active Group Strategy) ---
+const fetchLatestGroup = async () => {
+    try {
+        statusMsg.value = '正在讀取目前管理群組...'
+        const res = await $fetch('/api/admin/get-latest-group')
+        if (res.success && res.group) {
+            userStore.groupId = res.group.groupId
+            console.log('[Admin] Locked to Latest Group:', res.group.groupName, res.group.groupId)
+            statusMsg.value = `已鎖定群組：${res.group.groupName}`
+        } else {
+            statusMsg.value = '尚未加入任何群組，或讀取失敗'
+        }
+    } catch (e) {
+        console.error('Failed to fetch latest group:', e)
+        statusMsg.value = '讀取群組資訊失敗'
+    }
+}
+
+onMounted(async () => {
+    // 1. Fetch Latest Group (Primary Strategy)
+    await fetchLatestGroup()
+    
+    // 2. Initialize LIFF (Secondary/Context Strategy)
+    if (!userStore.isInitializing) {
+        await userStore.initLiff()
+    }
+
     if (typeof window !== 'undefined') {
         currentUrl.value = window.location.href
     }

@@ -71,26 +71,49 @@ export default defineEventHandler(async (event: H3Event) => {
         }
       }
 
-      // 6. Welcome Message / Setup Link on 'join'
+      // 6. Welcome Message & Server-Side Persistence on 'join'
       if (webhookEvent.type === 'join' && groupId) {
         try {
           const { messagingApi } = await import('@line/bot-sdk')
+          const { adminDb } = await import('~/server/utils/firebase')
+
           const client = new messagingApi.MessagingApiClient({ channelAccessToken: config.lineChannelAccessToken })
-          // Use liff.state to bypass "Concatenate all params" setting issues
-          // This forces the params to be passed to the endpoint
-          const targetQuery = `?groupId=${groupId}`
-          const setupLink = `https://liff.line.me/${config.public.liffId}/?liff.state=${encodeURIComponent(targetQuery)}`
+
+          // A. Fetch Group Summary (Name & Picture)
+          let groupName = '未命名群組'
+          let pictureUrl = ''
+          try {
+            const summary = await client.getGroupSummary(groupId)
+            groupName = summary.groupId
+            if (summary.groupName) groupName = summary.groupName
+            if (summary.pictureUrl) pictureUrl = summary.pictureUrl
+            console.log(`[Webhook] Fetched Group Summary: ${groupName}`)
+          } catch (summaryError) {
+            console.warn('[Webhook] Failed to fetch group summary (Bot might not have permission yet):', summaryError)
+          }
+
+          // B. Save to Firestore (Single Active Group Strategy)
+          await adminDb.collection('system').doc('latestGroup').set({
+            groupId: groupId,
+            groupName: groupName,
+            pictureUrl: pictureUrl,
+            updatedAt: new Date().getTime()
+          })
+          console.log('[Webhook] ✅ Saved latestGroup to Firestore:', groupName)
+
+          // C. Send Simple Welcome Message
+          const setupLink = `https://liff.line.me/${config.public.liffId}` // No params needed now!
 
           await client.replyMessage({
             replyToken: (webhookEvent as any).replyToken,
             messages: [{
               type: 'text',
-              text: `感謝邀請！我是挑日子機器人 📅\n\n本群組的真實 ID 為：\n${groupId}\n\n管理員請點擊下方連結完成初始設定：\n${setupLink}\n\n⚠️ 注意：請務必透過此連結進入，以鎖定群組 ID 並確保設定不隨 Session 遺失。`
+              text: `感謝邀請！我是挑日子機器人 📅\n\n已將本群組設為「目前管理群組」：\n${groupName}\n\n管理員請直接點擊下方連結進入設定：\n${setupLink}`
             }]
           })
           console.log('[Webhook] Welcome message sent to', groupId)
         } catch (e: any) {
-          console.error('[Webhook] Failed to send welcome message:', e)
+          console.error('[Webhook] Failed to process join event:', e)
         }
       }
     }
