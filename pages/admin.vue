@@ -262,94 +262,19 @@ const { $toast } = useNuxtApp()
 
 const loading = ref(true)
 const isAdmin = computed(() => userStore.isAdmin)
-const isIdValid = computed(() => {
-    const id = userStore.groupId
-    if (!id) return false
-    return /^([CR][0-9a-fA-F]{32}|[0-9a-fA-F-]{36})$/i.test(id) || id.startsWith('mock-')
-})
+// Trust server ID, but check basic presence
+const isIdValid = computed(() => !!userStore.groupId)
+
 const generatedLink = ref('')
-const manualRealGroupId = ref('')
 const currentUrl = ref('')
 const statusMsg = ref('')
 
-// --- 1. Init: Fetch Latest Group from Server (Single Active Group Strategy) ---
-const fetchLatestGroup = async () => {
-    try {
-        statusMsg.value = '正在讀取目前管理群組...'
-        const res = await $fetch('/api/admin/get-latest-group')
-        if (res.success && res.group) {
-            userStore.groupId = res.group.groupId
-            console.log('[Admin] Locked to Latest Group:', res.group.groupName, res.group.groupId)
-            statusMsg.value = `已鎖定群組：${res.group.groupName}`
-        } else {
-            statusMsg.value = '尚未加入任何群組，或讀取失敗'
-        }
-    } catch (e) {
-        console.error('Failed to fetch latest group:', e)
-        statusMsg.value = '讀取群組資訊失敗'
-    }
-}
-
-onMounted(async () => {
-    // 1. Fetch Latest Group (Primary Strategy)
-    await fetchLatestGroup()
-    
-    // 2. Initialize LIFF (Secondary/Context Strategy)
-    if (!userStore.isInitializing) {
-        await userStore.initLiff()
-    }
-
-    if (typeof window !== 'undefined') {
-        currentUrl.value = window.location.href
-    }
-})
-const urlSnippet = computed(() => {
-    if (typeof window === 'undefined') return 'Server Side'
-    return `Search: ${window.location.search} | Hash: ${window.location.hash}` 
-})
-
-const handleManualSync = async () => {
-    if (!manualRealGroupId.value) return
-    const idRegex = /^[CR][0-9a-f]{32}$/i
-    if (!idRegex.test(manualRealGroupId.value)) {
-        alert('請輸入正確的 LINE ID 格式 (C 或 R 開頭共 33 字元)')
-        return
-    }
-
-    try {
-        const res = await $fetch('/api/admin/sync-group-mapping', {
-            method: 'POST',
-            body: {
-                liffGroupId: userStore.groupId,
-                realGroupId: manualRealGroupId.value
-            }
-        })
-        if (res.success) {
-            // Update the store to the stable ID immediately
-            userStore.groupId = manualRealGroupId.value
-            
-            // Generate Permanent Link (liff.state-based for robustness)
-            const config = useRuntimeConfig()
-            const liffBase = `https://liff.line.me/${userStore.debugInfo?.liffId || ''}`
-            const targetQuery = `?groupId=${manualRealGroupId.value}`
-            generatedLink.value = `${liffBase}/?liff.state=${encodeURIComponent(targetQuery)}`
-
-            alert('🚀 同步成功！此頁面已自動鎖定至穩定 ID。現在您可以安全地保存設定，機器人也能正常發送推播了。')
-            manualRealGroupId.value = ''
-            // The watcher in admin.vue will automatically fetch data for the new groupId
-        }
-    } catch (e: any) {
-        alert('❌ 同步失敗：' + (e.data?.statusMessage || e.message))
-    }
-}
-
 const saving = ref(false)
-const savingSettings = ref(false) // New state for settings save
+const savingSettings = ref(false)
 const status = computed(() => scheduleStore.status)
 
 const activityOptions = ['爬山', '踏青', '桌遊', '逛街', '密室', '聚餐', '其他']
 
-// Data Types
 interface EventForm {
     types: string[]
     time: string
@@ -357,14 +282,12 @@ interface EventForm {
     cost: string
     paymentInfo: string
     remarks: string
-    active: boolean // internal use for UI focus
+    active: boolean
 }
 
 const forms = reactive<Record<string, EventForm>>({})
-// New: Store custom remarks for 'Other' type
 const otherRemarks = reactive<Record<string, string>>({}) 
 
-// New: Group Settings
 const groupSettings = reactive({
     autoVoteStartDay: null as number | null,
     autoVoteEndDay: null as number | null
@@ -372,12 +295,10 @@ const groupSettings = reactive({
 
 const winningDates = ref<(DateInfo & { countO: number })[]>([])
 
-// Calculate Winning Dates
+// --- Helper Functions (Defined before use) ---
+
 const calculateWinningDates = (targets: DateInfo[]) => {
-    // 1. Get all votes
     const votes = scheduleStore.votes
-    
-    // 2. Map and Filter
     const candidates = targets.map(d => {
         const vote = votes[d.dateStr]
         return {
@@ -387,18 +308,12 @@ const calculateWinningDates = (targets: DateInfo[]) => {
     })
     .filter(d => d.countO >= 3)
     .sort((a, b) => b.countO - a.countO)
-    
-    // 3. Take top 2
     return candidates.slice(0, 2)
 }
 
-// Helper to init form
 const initForm = (dateStr: string) => {
     if (!forms[dateStr]) {
-        // Load existing if available
         const existing = scheduleStore.events[dateStr]
-        
-        // Handle 'Other' remark parsing
         const rawTypes = existing?.types || []
         let parsedTypes: string[] = []
         let remark = ''
@@ -412,9 +327,7 @@ const initForm = (dateStr: string) => {
             }
         })
         
-        if (remark) {
-           otherRemarks[dateStr] = remark
-        }
+        if (remark) otherRemarks[dateStr] = remark
 
         forms[dateStr] = {
             types: parsedTypes,
@@ -438,46 +351,47 @@ const toggleType = (dateStr: string, type: string) => {
     }
 }
 
-// Save Group Settings
+// --- Status & Settings Management ---
+
+const fetchLatestGroup = async () => {
+    try {
+        statusMsg.value = '正在讀取目前管理群組...'
+        const res = await $fetch('/api/admin/get-latest-group')
+        if (res.success && res.group) {
+            userStore.groupId = res.group.groupId
+            
+            // Load Settings
+            if (res.group.autoVoteStartDay) groupSettings.autoVoteStartDay = res.group.autoVoteStartDay
+            if (res.group.autoVoteEndDay) groupSettings.autoVoteEndDay = res.group.autoVoteEndDay
+            
+            console.log('[Admin] Locked to Latest Group:', res.group.groupName, res.group.groupId)
+            statusMsg.value = `已鎖定群組：${res.group.groupName}`
+        } else {
+            statusMsg.value = '尚未加入任何群組，或讀取失敗 (請先邀請機器人加入群組)'
+        }
+    } catch (e) {
+        console.error('Failed to fetch latest group:', e)
+        statusMsg.value = '讀取群組資訊失敗'
+    }
+}
+
 const saveGroupSettings = async () => {
     if (!userStore.groupId) return
     savingSettings.value = true
     try {
         const { db } = useNuxtApp().$firebase
-        const { doc, setDoc, updateDoc } = await import('firebase/firestore')
-        const groupRef = doc(db, 'groups', userStore.groupId)
+        const { doc, setDoc } = await import('firebase/firestore')
         
-        // 1. Save Settings
-        await setDoc(groupRef, {
+        // Single Source of Truth
+        const systemGroupRef = doc(db, 'system', 'latestGroup')
+        
+        await setDoc(systemGroupRef, {
             autoVoteStartDay: groupSettings.autoVoteStartDay,
             autoVoteEndDay: groupSettings.autoVoteEndDay,
             updatedAt: Date.now()
         }, { merge: true })
         
-        // 2. Immediate Status Check
-        if (groupSettings.autoVoteStartDay && groupSettings.autoVoteEndDay) {
-            const shouldBeOpen = getVotingPeriodStatus(new Date(), groupSettings.autoVoteStartDay, groupSettings.autoVoteEndDay) === 'OPEN'
-            const currentStatus = scheduleStore.status
-            const scheduleId = getScheduleId()
-            
-            if (shouldBeOpen && currentStatus !== 'open') {
-                if (confirm(`📅 根據新設定，目前應該是「開放投票」期間。\n是否更新狀態為 OPEN？`)) {
-                    await updateDoc(doc(db, 'monthlySchedules', scheduleId), {
-                        status: 'open',
-                        updatedAt: Date.now()
-                    })
-                }
-            } else if (!shouldBeOpen && currentStatus === 'open') {
-                if (confirm(`📅 根據新設定，目前應該是「非填寫」期間。\n是否更新狀態為 CLOSED？`)) {
-                     await updateDoc(doc(db, 'monthlySchedules', scheduleId), {
-                        status: 'closed',
-                        updatedAt: Date.now()
-                    })
-                }
-            }
-        }
-
-        alert('✅ 排程設定已儲存')
+        alert('✅ 排程設定已儲存 (已更新至目前管理群組)')
     } catch (e: any) {
         console.error(e)
         alert('❌ 儲存失敗: ' + e.message)
@@ -486,81 +400,52 @@ const saveGroupSettings = async () => {
     }
 }
 
-// Initial Data Load
+// --- Lifecycle ---
+
 onMounted(async () => {
     if (import.meta.server) return
     loading.value = true
 
     try {
-        // 1. Fetch holidays and calc dates
+        // 1. Fetch Latest
+        await fetchLatestGroup()
+        
+        // 2. Fetch Holidays
         const holidays = await $fetch<any[]>('/holidays.json').catch(() => [])
         const targets = getNextMonthTargets(holidays)
         
-        // 2. Reactive Subscription & Fetch Settings
+        // 3. Subscribe to Schedule
         stopWatch = watch(() => userStore.groupId, async (newGroupId) => {
-            // 0. RESET State for new group context (Isolate data)
-            console.log('[Admin] groupId changed to:', newGroupId, 'Resetting UI state...')
-            groupSettings.autoVoteStartDay = null
-            groupSettings.autoVoteEndDay = null
+            if (!newGroupId) return
+            
+            // Reset
             Object.keys(forms).forEach(key => delete forms[key])
             Object.keys(otherRemarks).forEach(key => delete otherRemarks[key])
             winningDates.value = []
-            
-            if (!newGroupId || !isIdValid.value) {
-                 console.log('[Admin] groupId missing or invalid, skipping fetch.')
-                 return
-            }
 
             if (targets.length > 0) {
-                 console.log('[Admin] groupId detected:', newGroupId, 'Subscribing...')
-                 
-                 // Fetch Group Settings
-                 const { db } = useNuxtApp().$firebase
-                 const { doc, getDoc } = await import('firebase/firestore')
-                 try {
-                     const groupSnap = await getDoc(doc(db, 'groups', newGroupId))
-                     if (groupSnap.exists()) {
-                         const data = groupSnap.data()
-                         groupSettings.autoVoteStartDay = data.autoVoteStartDay || null
-                         groupSettings.autoVoteEndDay = data.autoVoteEndDay || null
-                     }
-                 } catch (err) {
-                     console.error('[Admin] Failed to fetch group settings', err)
-                 }
-
                  const [y, m] = targets[0].dateStr.split('-')
-                 
-                 // Prevent redundant subs if already same
                  await scheduleStore.subscribeToMonth(newGroupId, Number(y), Number(m))
-                 
                  const dateStrs = targets.map(d => d.dateStr)
                  await scheduleStore.subscribeToDates(newGroupId, dateStrs)
-                 console.log('[Admin] Subscription done.')
             }
         }, { immediate: true })
 
-        // 3. Watch for votes to settle/change
+        // 4. Calc Winners
         watchEffect(() => {
             const winners = calculateWinningDates(targets)
             winningDates.value = winners
-            
-            // Init forms for winners
             winners.forEach(w => initForm(w.dateStr))
         })
         
-        // 4. Sync remote events to local forms when loaded
-        // This fixes the issue where forms init with empty data before Fetch completes
+        // 5. Sync Events
         watch(() => scheduleStore.events, (newEvents) => {
-            if (!newEvents) return
-            console.log('[Admin] Events loaded, syncing forms...')
-            Object.entries(newEvents).forEach(([date, evt]: [string, any]) => {
-                // If form exists (it's a winning date) and we have data, update it
+             if (!newEvents) return
+             Object.entries(newEvents).forEach(([date, evt]: [string, any]) => {
                 if (forms[date]) {
-                    // Handle 'Other' remark parsing
                     const rawTypes = evt.types || []
                     let parsedTypes: string[] = []
                     let remark = ''
-                    
                     rawTypes.forEach((t: string) => {
                         if (t.startsWith('其他:')) {
                             parsedTypes.push('其他')
@@ -569,12 +454,8 @@ onMounted(async () => {
                             parsedTypes.push(t)
                         }
                     })
-                    
-                    if (remark) {
-                       otherRemarks[date] = remark
-                    }
+                    if (remark) otherRemarks[date] = remark
 
-                    // We overwrite local form with server data
                     forms[date] = {
                         types: parsedTypes,
                         time: evt.time || '10:00',
@@ -582,21 +463,20 @@ onMounted(async () => {
                         cost: evt.cost || '',
                         paymentInfo: evt.paymentInfo || '',
                         remarks: evt.remarks || '',
-                        active: true // Mark as valid/active from server
+                        active: true
                     }
                 }
-            })
+             })
         }, { deep: true })
         
     } catch (e) {
         console.error(e)
     } finally {
-        // Force loading false after short delay to ensure UI updates
-        // even if subscription takes a moment.
-        setTimeout(() => { 
-            console.log('[Admin] Force ending loading state')
-            loading.value = false 
-        }, 1500)
+        setTimeout(() => { loading.value = false }, 1500)
+    }
+    
+    if (typeof window !== 'undefined') {
+        currentUrl.value = window.location.href
     }
 })
 

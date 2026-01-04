@@ -18,7 +18,10 @@ export default defineEventHandler(async (event) => {
         groupId: data?.groupId,
         groupName: data?.groupName,
         pictureUrl: data?.pictureUrl,
-        updatedAt: data?.updatedAt
+        updatedAt: data?.updatedAt,
+        // Include settings (Consolidated storage)
+        autoVoteStartDay: data?.autoVoteStartDay,
+        autoVoteEndDay: data?.autoVoteEndDay
       }
     }
   } catch (error: any) {
