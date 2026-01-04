@@ -55,21 +55,9 @@ export default defineEventHandler(async (event: H3Event) => {
       console.log('[Webhook] Group ID:', groupId)
 
       // 5. Store user-group mapping in Firestore
-      if (userId) {
-        try {
-          const { adminDb } = await import('~/server/utils/firebase')
-          await adminDb.collection('userGroupMappings').doc(userId).set({
-            userId,
-            groupId,
-            updatedAt: new Date().getTime(),
-            eventType: webhookEvent.type
-          }, { merge: true })
-
-          console.log('[Webhook] ✅ Mapping saved to Firestore')
-        } catch (firestoreError: any) {
-          console.error('[Webhook] Firestore save error:', firestoreError)
-        }
-      }
+      // 5. Store user-group mapping in Firestore -> REMOVED (Single Group Strategy)
+      // We no longer track individual user-group relationships here.
+      // Logic is simplified to system/latestGroup on join event.
 
       // 6. Welcome Message & Server-Side Persistence on 'join'
       if (webhookEvent.type === 'join' && groupId) {

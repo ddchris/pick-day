@@ -177,15 +177,8 @@ export const useUserStore = defineStore('user', {
           activeIdSource: finalId === qId ? 'URL' : finalId === storedStableId ? 'Storage' : 'Context'
         }
 
-        // --- ID MAPPING SYNC ---
-        // If we have both a UUID from context AND a real ID from URL, sync them!
-        if (isStable(qId) && cId && cId !== qId && isValidGroupId(cId)) {
-          console.log('[User Store] 🔄 Mismatch found. Syncing temporary UUID -> Stable ID mapping...')
-          $fetch('/api/admin/sync-group-mapping', {
-            method: 'POST',
-            body: { liffGroupId: cId, realGroupId: qId }
-          }).catch(err => console.error('[User Store] Sync Mapping Failed:', err))
-        }
+        // --- ID MAPPING SYNC REMOVED (Legacy) ---
+        // userGroupMappings is no longer used in Single-Group mode.
 
         if (!this.groupId) {
           console.warn('[User Store] ⚠️ No valid Group ID detected.')

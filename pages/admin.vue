@@ -67,16 +67,7 @@
                        </div>
                    </div>
                    
-                   <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
-                       <p class="font-bold text-teal-600 mb-1">🔗 群組映射工具 (修復推播)</p>
-                       <p class="text-[9px] mb-2 text-gray-400">如果機器人無法發送訊息，請輸入該群組真正的 LINE ID (C...) 並點擊同步。</p>
-                       <div class="flex gap-2">
-                           <input type="text" v-model="manualRealGroupId" placeholder="請輸入 C 開頭的真實 ID" 
-                               class="flex-1 p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
-                           />
-                           <button @click="handleManualSync" class="bg-teal-600 text-white px-2 py-1 rounded hover:bg-teal-700">同步</button>
-                       </div>
-                   </div>
+                   <!-- REMOVED: Group Mapping Tool (Obsolete) -->
                </div>
            </details>
        </div>
@@ -267,6 +258,10 @@ const isIdValid = computed(() => !!userStore.groupId)
 
 const generatedLink = ref('')
 const currentUrl = ref('')
+const urlSnippet = computed(() => {
+    if (typeof window === 'undefined') return ''
+    return currentUrl.value ? new URL(currentUrl.value).search + new URL(currentUrl.value).hash : ''
+})
 const statusMsg = ref('')
 
 const saving = ref(false)
