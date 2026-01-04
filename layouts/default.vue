@@ -38,11 +38,20 @@
       </div>
 
       <!-- External Browser / Missing Group Warning -->
-      <div v-else-if="!userStore.groupId" class="bg-blue-600 text-white p-4 flex items-start gap-3 shadow-md animate-slide-down relative z-[60]">
-        <div class="i-carbon-information-filled text-2xl mt-0.5 shrink-0"></div>
-        <div>
-          <p class="font-bold text-sm mb-1">請設定在 LINE APP 內部開啟網頁</p>
-          <p class="text-xs opacity-90 leading-relaxed">目前未偵測到群組資訊。請從 <span class="font-bold underline">LINE 群組內</span> 點擊連結開啟，以獲得完整的功能權限。</p>
+      <div v-else-if="!userStore.groupId" class="bg-blue-600 text-white p-4 flex flex-col gap-3 shadow-md animate-slide-down relative z-[60]">
+        <div class="flex items-start gap-3">
+            <div class="i-carbon-information-filled text-2xl mt-0.5 shrink-0"></div>
+            <div>
+              <p class="font-bold text-sm mb-1">請設定在 LINE APP 內部開啟網頁</p>
+              <p class="text-xs opacity-90 leading-relaxed">目前未偵測到群組資訊。請從 <span class="font-bold underline">LINE 群組內</span> 點擊連結開啟，以獲得完整的功能權限。</p>
+            </div>
+        </div>
+        
+        <!-- Debug Metadata -->
+        <div class="mt-1 p-2 bg-black/20 rounded text-[10px] font-mono flex flex-wrap gap-x-4 gap-y-1 opacity-80">
+            <span>Type: {{ userStore.debugInfo?.type || 'null' }}</span>
+            <span>Client: {{ userStore.isInLineClient ? 'LINE' : 'External' }}</span>
+            <span v-if="userStore.initError" class="text-red-300">Error: {{ userStore.initError }}</span>
         </div>
       </div>
     </div>

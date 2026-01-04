@@ -20,47 +20,43 @@ export const useUserStore = defineStore('user', {
   actions: {
     async initLiff() {
       const config = useRuntimeConfig()
-      const { $toast } = useNuxtApp() // Assuming we add a toast plugin later or use a store action
+      const { $liffInit } = useNuxtApp()
+      const route = useRoute()
 
       try {
+        this.isInitializing = true
+
         // --- Mock Mode Check ---
-        const route = useRoute()
         if (route.query.mockGroupId && route.query.mockUserId) {
           this.mockMode = true
           this.groupId = route.query.mockGroupId as string
-          this.profile = {
-            userId: route.query.mockUserId as string,
-            displayName: 'Mock User',
-            pictureUrl: '',
-          }
-          // For mock mode, we might skip firebase auth or force a mock login
+          this.profile = { userId: route.query.mockUserId as string, displayName: 'Mock User', pictureUrl: '' }
           console.log('Mock Mode Activated:', this.profile, this.groupId)
           return
         }
 
-        // --- Real LIFF Init ---
-        if (!config.public.liffId) {
-          throw new Error('LIFF ID is missing in config')
+        // --- Wait for LIFF Plugin Init ---
+        if (!$liffInit) {
+          throw new Error('LIFF Plugin not found or failed to provide liffInit')
         }
 
-        console.log('[LIFF] Initializing with ID:', config.public.liffId)
-        console.log('[LIFF] UserAgent:', navigator.userAgent)
-
-        await liff.init({ liffId: config.public.liffId })
-        console.log('[LIFF] Init Success')
+        console.log('[User Store] Waiting for LIFF Early Init...')
+        await $liffInit
+        console.log('[User Store] LIFF Init confirmed. UserAgent:', navigator.userAgent)
 
         this.isInLineClient = liff.isInClient()
         this.isExternalBrowser = !liff.isInClient()
 
-        console.log('[LIFF] isInClient:', this.isInLineClient)
+        console.log('[User Store] isInClient:', this.isInLineClient)
 
+        // Force Login if external browser and not logged in
         if (!liff.isLoggedIn()) {
-          // If in external browser, we might want to login to get profile, 
-          // but we won't get groupId.
+          console.log('[User Store] Not logged in, triggering login flow...')
           liff.login()
           return
         }
 
+        console.log('[User Store] Logged in. Fetching profile...')
         const profile = await liff.getProfile()
         this.profile = {
           userId: profile.userId,
@@ -69,14 +65,11 @@ export const useUserStore = defineStore('user', {
         }
 
         const context = liff.getContext()
-        console.log('[LIFF] === LIFF Context Debug ===')
-        console.log('[LIFF] Full Context:', JSON.stringify(context, null, 2))
-        console.log('[LIFF] Context Type:', context?.type)
-        console.log('[LIFF] Group ID:', context?.groupId)
-        console.log('[LIFF] Room ID:', context?.roomId)
+        console.log('[User Store] === LIFF Context Debug ===')
+        console.log('[User Store] Context Type:', context?.type)
+        console.log('[User Store] Raw Context:', JSON.stringify(context, null, 2))
 
-        // Save user profile to Firestore (for push notifications)
-        // Do this BEFORE login attempt so names appear correctly even if login fails
+        // Save user profile to Firestore
         try {
           const { db } = useNuxtApp().$firebase
           const { doc, setDoc } = await import('firebase/firestore')
@@ -99,21 +92,13 @@ export const useUserStore = defineStore('user', {
           liffId: config.public.liffId,
           viewType: context?.viewType,
           endpointUrl: context?.endpointUrl,
-          accessTokenHash: context?.accessTokenHash,
-          availability: context?.availability,
-          scope: context?.scope,
-          menuColorSetting: context?.menuColorSetting,
-          utsTracking: context?.utsTracking,
-          miniDomainAllowed: context?.miniDomainAllowed,
-          isIapSandbox: context?.isIapSandbox,
-          permanentLinkPattern: context?.permanentLinkPattern
+          isInClient: this.isInLineClient
         }
 
         // Helper to validate LINE Group IDs
         const isValidGroupId = (id: string | null) => {
           if (!id) return false
-          // LINE Group IDs start with C, Rooms with R, followed by hash
-          // Mock IDs are allowed for dev
+          // LINE Group IDs start with C (group) or R (room), followed by hash. Mock IDs are allowed for dev.
           return /^[CR][0-9a-fA-F]{32}$/i.test(id) || id.startsWith('mock-')
         }
 
@@ -125,20 +110,19 @@ export const useUserStore = defineStore('user', {
 
         if (detectedId && isValidGroupId(detectedId)) {
           this.groupId = detectedId
-          console.log('[User Store] Valid Group/Room ID set:', this.groupId)
+          console.log('[User Store] ✅ Valid Group/Room ID set:', this.groupId)
         } else if (detectedId) {
-          console.warn('[User Store] Detected ID format invalid:', detectedId)
+          console.warn('[User Store] ❌ Detected ID format invalid:', detectedId)
         } else {
-          console.warn('[User Store] No Group/Room ID detected in context')
+          console.warn('[User Store] ⚠️ No Group/Room ID in context. Context Type:', context?.type)
         }
 
-        // NO FALLBACK to database mapping.
-        // We only trust the current context.
-        if (!this.groupId && this.profile?.userId) {
+        // URL Fallback (Highest Priority for specific links)
+        if (!this.groupId) {
           const qId = route.query.groupId as string
           if (qId && isValidGroupId(qId)) {
             this.groupId = qId
-            console.log('[User Store] Group ID set from valid URL Query:', this.groupId)
+            console.log('[User Store] ✅ Group ID set from valid URL Query:', this.groupId)
           }
         }
 
