@@ -25,6 +25,22 @@
           </div>
        </div>
 
+       <!-- Debug Info (Temporary for troubleshooting) -->
+       <div class="px-4 py-2 bg-gray-50 dark:bg-gray-900 rounded-lg text-xs font-mono text-gray-500 mb-4 overflow-x-auto">
+           <details>
+               <summary class="cursor-pointer hover:text-teal-600 font-bold mb-1 select-none">
+                   🐞 除錯資訊 (點擊展開): {{ userStore.groupId || 'Null' }}
+               </summary>
+               <div class="space-y-1 p-2 bg-gray-100 dark:bg-black/20 rounded border border-gray-200 dark:border-gray-700">
+                   <p>Group ID: {{ userStore.groupId }}</p>
+                   <p>Is Admin: {{ isAdmin }}</p>
+                   <p>Context Type: {{ userStore.debugInfo?.type || 'None' }}</p>
+                   <p>View Type: {{ userStore.debugInfo?.viewType || 'None' }}</p>
+                   <pre>{{ JSON.stringify(userStore.debugInfo, null, 2) }}</pre>
+               </div>
+           </details>
+       </div>
+
        <!-- Status Banner -->
        <div class="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
            <div>

@@ -20,7 +20,7 @@ export default defineNuxtConfig({
       firebaseMessagingSenderId: '',
       firebaseAppId: '',
       firebaseMeasurementId: '',
-      liffId: '',
+      liffId: '2008736328-XQ11VRKP',
       adminUserIds: '', // Comma-separated LINE User IDs
     }
   },
