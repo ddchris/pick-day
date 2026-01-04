@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
               action: {
                 type: 'uri',
                 label: '前往投票',
-                uri: 'https://pick-52c90.web.app/'
+                uri: 'https://pick-day.vercel.app/'
               }
             }
           ]
