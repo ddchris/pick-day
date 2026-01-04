@@ -31,50 +31,50 @@ export default defineEventHandler(async (event) => {
 
     // Initialize Firebase Admin
     const { adminDb } = await import('~/server/utils/firebase')
-    const groupRef = adminDb.collection('groups').doc(groupId)
+    // TARGET: system/latestGroup
+    const groupRef = adminDb.collection('system').doc('latestGroup')
 
-    // Check if group already exists
+    // Check if group exists and matches the requested ID
     const doc = await groupRef.get()
+    const currentData = doc.data() || {}
 
-    if (doc.exists) {
-      const currentData = doc.data() || {}
-      const currentAdmins = currentData.adminIds || []
-
-      // Merge new default admins into existing list
-      const newAdmins = [...new Set([...currentAdmins, ...defaultAdmins])]
-
-      // If there are changes, update Firestore
-      if (newAdmins.length > currentAdmins.length) {
-        await groupRef.update({
-          adminIds: newAdmins,
-          updatedAt: Date.now()
-        })
-        console.log(`Updated group ${groupId} admins:`, newAdmins)
-        return {
-          success: true,
-          message: 'Group admins updated',
-          adminIds: newAdmins,
-        }
-      }
-
+    // Safety: Only update if the latestGroup matches the requested ID
+    if (!doc.exists || currentData.groupId !== groupId) {
+      // In "Single Active Group" mode, we only support managing the latest group.
+      // If the ID doesn't match, we likely shouldn't be initializing it here
+      // as it would overwrite the "Active" pointer or be irrelevant.
+      console.warn(`[InitGroup] Mismatch or missing: Requested ${groupId}, Current Latest: ${currentData.groupId}`)
       return {
-        success: true,
-        message: 'Group already exists and admins are up-to-date',
-        adminIds: currentAdmins,
+        success: false,
+        message: 'Target group is not the active latest group.',
+        adminIds: []
       }
     }
 
-    // Create group with default admins
-    await groupRef.set({
-      adminIds: defaultAdmins,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    })
+    const currentAdmins = currentData.adminIds || []
+
+    // Merge new default admins into existing list
+    const newAdmins = [...new Set([...currentAdmins, ...defaultAdmins])]
+
+    // If there are changes, update Firestore
+    if (newAdmins.length > currentAdmins.length) {
+      await groupRef.set({
+        adminIds: newAdmins,
+        updatedAt: Date.now()
+      }, { merge: true })
+
+      console.log(`Updated latestGroup (${groupId}) admins:`, newAdmins)
+      return {
+        success: true,
+        message: 'Group admins updated',
+        adminIds: newAdmins,
+      }
+    }
 
     return {
       success: true,
-      message: 'Group initialized with default admins',
-      adminIds: defaultAdmins,
+      message: 'Admins are up-to-date',
+      adminIds: currentAdmins,
     }
   } catch (error: any) {
     console.error('Failed to initialize group:', error)

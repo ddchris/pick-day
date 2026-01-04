@@ -246,27 +246,34 @@ export const useUserStore = defineStore('user', {
         console.log('Admin status (Env Match):', true)
       }
 
-      // 2. Check Group Admin (Firestore)
+      // 2. Check Group Admin (Firestore - Single Active Group)
       if (this.groupId) {
         try {
-          // Initialize group if needed
+          // Initialize group if needed (Adding default admins to Latest Group)
           await $fetch('/api/admin/init-group', {
             method: 'POST',
             body: { groupId: this.groupId }
           })
 
-          // Check Firestore
+          // Check Firestore (system/latestGroup)
           const { db } = useNuxtApp().$firebase
           const { doc, getDoc } = await import('firebase/firestore')
-          const groupRef = doc(db, 'groups', this.groupId)
+
+          // TARGET: system/latestGroup
+          const groupRef = doc(db, 'system', 'latestGroup')
           const snap = await getDoc(groupRef)
 
           if (snap.exists()) {
             const data = snap.data()
-            const adminIds = data.adminIds || []
-            if (adminIds.includes(this.profile.userId)) {
-              this.isAdmin = true
-              console.log('Admin status (Group):', true)
+            // Verify we are checking the correct group
+            if (data.groupId !== this.groupId) {
+              console.warn('[UserStore] Admin check mismatch: Local ID', this.groupId, 'vs System ID', data.groupId)
+            } else {
+              const adminIds = data.adminIds || []
+              if (adminIds.includes(this.profile.userId)) {
+                this.isAdmin = true
+                console.log('Admin status (Group):', true)
+              }
             }
           }
         } catch (error) {
