@@ -1,0 +1,28 @@
+{
+  "name": "Pick",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^10.5.0",
+    "@line/liff": "^2.27.3",
+    "firebase": "^12.7.0",
+    "firebase-admin": "^13.6.0",
+    "nuxt": "^4.2.2",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.26",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@iconify-json/carbon": "^1.2.15",
+    "@pinia/nuxt": "^0.11.3",
+    "@unocss/nuxt": "^66.5.12",
+    "unocss": "^66.5.12"
+  }
+}
