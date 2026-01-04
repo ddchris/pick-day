@@ -364,6 +364,11 @@ onMounted(async () => {
             if (newGroupId && targets.length > 0) {
                  console.log('[Admin] groupId detected:', newGroupId, 'Subscribing...')
                  
+                 // RESET State for new group
+                 groupSettings.autoVoteStartDay = null
+                 groupSettings.autoVoteEndDay = null
+                 // Reset "otherRemarks" as well? Forms are re-synced by "events" watcher, but ensuring clean state is good.
+                 
                  // Fetch Group Settings
                  const { db } = useNuxtApp().$firebase
                  const { doc, getDoc } = await import('firebase/firestore')
