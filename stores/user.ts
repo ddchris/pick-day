@@ -92,7 +92,8 @@ export const useUserStore = defineStore('user', {
           liffId: config.public.liffId,
           viewType: context?.viewType,
           endpointUrl: context?.endpointUrl,
-          isInClient: this.isInLineClient
+          isInClient: this.isInLineClient,
+          rawContext: context // Keep full object for deep debug
         }
 
         // Helper to validate LINE Group IDs

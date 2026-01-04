@@ -48,10 +48,15 @@
         </div>
         
         <!-- Debug Metadata -->
-        <div class="mt-1 p-2 bg-black/20 rounded text-[10px] font-mono flex flex-wrap gap-x-4 gap-y-1 opacity-80">
-            <span>Type: {{ userStore.debugInfo?.type || 'null' }}</span>
-            <span>Client: {{ userStore.isInLineClient ? 'LINE' : 'External' }}</span>
-            <span v-if="userStore.initError" class="text-red-300">Error: {{ userStore.initError }}</span>
+        <div class="mt-1 p-2 bg-black/20 rounded text-[10px] font-mono flex flex-col gap-1 opacity-80">
+            <div class="flex flex-wrap gap-x-4">
+                <span>Type: {{ userStore.debugInfo?.type || 'null' }}</span>
+                <span>Client: {{ userStore.isInLineClient ? 'LINE' : 'External' }}</span>
+                <span v-if="userStore.initError" class="text-red-300">Error: {{ userStore.initError }}</span>
+            </div>
+            <div class="truncate text-teal-300">
+                RawID: {{ userStore.debugInfo?.groupId || userStore.debugInfo?.roomId || 'Missing' }}
+            </div>
         </div>
       </div>
     </div>
