@@ -12,7 +12,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   }
 
   const userStore = useUserStore()
-  userStore.addLog(`[LIFF Plugin] Starting... Search: ${window.location.search}, Hash: ${window.location.hash}`)
+  userStore.addLog(`[LIFF Plugin] Starting... HREF: ${window.location.href}`)
 
   // --- EARLY CAPTURE: Grab groupId before LIFF/Nuxt eats it ---
   if (typeof window !== 'undefined') {
