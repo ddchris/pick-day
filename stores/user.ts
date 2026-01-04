@@ -103,24 +103,40 @@ export const useUserStore = defineStore('user', {
           permanentLinkPattern: context?.permanentLinkPattern
         }
 
-        // Set GroupId
-        if (context?.type === 'group' || context?.type === 'room') {
-          this.groupId = context.groupId || context.roomId || null
-          console.log('Group/Room ID set:', this.groupId)
-        } else {
-          console.warn('Not in a group context', context)
+        // Helper to validate LINE Group IDs
+        const isValidGroupId = (id: string | null) => {
+          if (!id) return false
+          // LINE Group IDs start with C, Rooms with R, followed by hash
+          // Mock IDs are allowed for dev
+          return /^[CR][0-9a-f]{32}$/.test(id) || id.startsWith('mock-')
         }
 
-        // Fetch Real Group ID only if we don't have one from LIFF (e.g. External Browser)
+        // Set GroupId
+        let detectedId: string | null = null
+        if (context?.type === 'group' || context?.type === 'room') {
+          detectedId = context.groupId || context.roomId || null
+        }
+
+        if (detectedId && isValidGroupId(detectedId)) {
+          this.groupId = detectedId
+          console.log('[User Store] Valid Group/Room ID set:', this.groupId)
+        } else if (detectedId) {
+          console.warn('[User Store] Detected ID format invalid:', detectedId)
+        } else {
+          console.warn('[User Store] No Group/Room ID detected in context')
+        }
+
+        // Fetch Real Group ID fallback (e.g. External Browser)
         if (!this.groupId && this.profile?.userId) {
-          // 1. Check URL Query Param first (Highest priority for external links)
-          if (route.query.groupId) {
-            this.groupId = route.query.groupId as string
-            console.log('[User Store] Group ID set from URL Query:', this.groupId)
+          // 1. Check URL Query Param
+          const qId = route.query.groupId as string
+          if (qId && isValidGroupId(qId)) {
+            this.groupId = qId
+            console.log('[User Store] Group ID set from valid URL Query:', this.groupId)
           }
           // 2. Fallback to webhook mapping
           else {
-            console.log('[User Store] No Group ID from LIFF/URL, attempting to fetch from webhook mapping...')
+            console.log('[User Store] Attempting to fetch from webhook mapping...')
             await this.fetchRealGroupId(this.profile.userId)
           }
         }
@@ -229,11 +245,11 @@ export const useUserStore = defineStore('user', {
           const realGroupId = snap.data().groupId
           console.log('[User Store] ✅ Real Group ID found from webhook:', realGroupId)
 
-          // If we found a mapping, use it regardless of whether it starts with 'C'
-          // (Allows for UUIDs or other formats used by LINE)
-          if (realGroupId) {
+          if (realGroupId && (realGroupId.startsWith('C') || realGroupId.startsWith('R') || realGroupId.startsWith('mock-'))) {
             this.groupId = realGroupId
-            console.log('[User Store] Updated groupId to:', this.groupId)
+            console.log('[User Store] Updated groupId to verified ID:', this.groupId)
+          } else {
+            console.warn('[User Store] Mapping found but ID format is invalid:', realGroupId)
           }
         } else {
           console.log('[User Store] No webhook mapping found, current groupId:', this.groupId)

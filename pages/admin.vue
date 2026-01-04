@@ -25,6 +25,18 @@
           </div>
        </div>
 
+       <!-- Invalid ID Warning -->
+       <div v-else-if="!isIdValid" class="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 p-4 rounded-lg flex items-start gap-3 border border-red-200 dark:border-red-800">
+          <div class="i-carbon-error-filled text-xl mt-0.5"></div>
+          <div>
+            <p class="font-bold">偵測到異常的 ID 格式</p>
+            <p class="text-xs mt-1">
+                目前的群組 ID ({{ userStore.groupId }}) 不符合 LINE 標準格式。<br>
+                這通常發生在 Context 遺失或使用了錯誤的連結。請確保您是從群組聊天室點開連結。
+            </p>
+          </div>
+       </div>
+
        <!-- Debug Info (Temporary for troubleshooting) -->
        <div class="px-4 py-2 bg-gray-50 dark:bg-gray-900 rounded-lg text-xs font-mono text-gray-500 mb-4 overflow-x-auto">
            <details>
@@ -33,6 +45,7 @@
                </summary>
                <div class="space-y-1 p-2 bg-gray-100 dark:bg-black/20 rounded border border-gray-200 dark:border-gray-700">
                    <p>Group ID: {{ userStore.groupId }}</p>
+                   <p>ID 格式是否正確: <span :class="isIdValid ? 'text-green-500' : 'text-red-500'">{{ isIdValid ? '正確' : '錯誤 (UUID/無效)' }}</span></p>
                    <p>Is Admin: {{ isAdmin }}</p>
                    <p>Context Type: {{ userStore.debugInfo?.type || 'None' }}</p>
                    <p>View Type: {{ userStore.debugInfo?.viewType || 'None' }}</p>
@@ -222,6 +235,11 @@ const { $toast } = useNuxtApp()
 
 const loading = ref(true)
 const isAdmin = computed(() => userStore.isAdmin)
+const isIdValid = computed(() => {
+    const id = userStore.groupId
+    if (!id) return false
+    return /^[CR][0-9a-f]{32}$/.test(id) || id.startsWith('mock-')
+})
 const saving = ref(false)
 const savingSettings = ref(false) // New state for settings save
 const status = computed(() => scheduleStore.status)
