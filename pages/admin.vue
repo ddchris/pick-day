@@ -59,6 +59,13 @@
                        <p class="text-[10px] break-all mb-1">Search/Hash: {{ urlSnippet }}</p>
                        <p class="break-all text-blue-500">Route Query Keys: {{ Object.keys(userStore.debugInfo?.routeQuery || {}).join(', ') }}</p>
                    </div>
+
+                   <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                       <p class="font-bold text-gray-500 mb-1">📜 Execution Log:</p>
+                       <div class="h-32 overflow-y-auto bg-black text-green-400 p-2 rounded text-[10px] font-mono leading-tight">
+                           <div v-for="(log, i) in userStore.logs" :key="i">{{ log }}</div>
+                       </div>
+                   </div>
                    
                    <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
                        <p class="font-bold text-teal-600 mb-1">🔗 群組映射工具 (修復推播)</p>

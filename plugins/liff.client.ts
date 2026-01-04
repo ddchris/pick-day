@@ -11,6 +11,9 @@ export default defineNuxtPlugin((nuxtApp) => {
     return
   }
 
+  const userStore = useUserStore()
+  userStore.addLog(`[LIFF Plugin] Starting... Search: ${window.location.search}, Hash: ${window.location.hash}`)
+
   // --- EARLY CAPTURE: Grab groupId before LIFF/Nuxt eats it ---
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search)
@@ -20,11 +23,15 @@ export default defineNuxtPlugin((nuxtApp) => {
     if (!urlGroupId && window.location.hash.includes('?')) {
       const hashParams = new URLSearchParams(window.location.hash.split('?')[1])
       urlGroupId = hashParams.get('groupId')
+      if (urlGroupId) userStore.addLog(`[LIFF Plugin] Found groupId in Hash: ${urlGroupId}`)
+    } else if (urlGroupId) {
+      userStore.addLog(`[LIFF Plugin] Found groupId in Search: ${urlGroupId}`)
     }
 
     // Check if it looks like a stable ID
     if (urlGroupId && (urlGroupId.startsWith('C') || urlGroupId.startsWith('R')) && urlGroupId.length > 30) {
       console.log('[LIFF Plugin] ⚡ Early captured groupId from URL:', urlGroupId)
+      userStore.addLog(`[LIFF Plugin] ⚡ Saving stable ID to Storage: ${urlGroupId}`)
       localStorage.setItem('stableGroupId', urlGroupId)
     }
   }

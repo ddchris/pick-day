@@ -15,9 +15,15 @@ export const useUserStore = defineStore('user', {
     isInitializing: true, // Start as true
     initError: null as string | null,
     debugInfo: null as any,
+    logs: [] as string[],
   }),
 
   actions: {
+    addLog(msg: string) {
+      const time = new Date().toLocaleTimeString()
+      this.logs.push(`[${time}] ${msg}`)
+    },
+
     async initLiff() {
       const config = useRuntimeConfig()
       const { $liffInit } = useNuxtApp()
@@ -106,6 +112,7 @@ export const useUserStore = defineStore('user', {
         // --- ID DETECTION LOGIC (Strict Priority) ---
         // 1. Try Nuxt Route Query
         let qId = route.query.groupId as string
+        this.addLog(`[Store] ID Check Start. qId(Route): ${qId}`)
 
         // 2. Fallback: Manual URL Parsing (window.location)
         if (!qId && typeof window !== 'undefined') {
@@ -113,52 +120,52 @@ export const useUserStore = defineStore('user', {
           qId = urlParams.get('groupId') as string
           if (!qId) {
             // Try Hash params just in case
-            const hash = window.location.hash
-            if (hash.includes('?')) {
-              const hashParams = new URLSearchParams(hash.split('?')[1])
+            if (window.location.hash.includes('?')) {
+              const hashParams = new URLSearchParams(window.location.hash.split('?')[1])
               qId = hashParams.get('groupId') as string
             }
           }
+          this.addLog(`[Store] Manual URL Parse. qId(Window): ${qId}`)
         }
 
         const cId = context?.groupId || context?.roomId || null
+        this.addLog(`[Store] LIFF Context ID: ${cId}`)
 
         // Relaxed Check: Just C/R + length > 30 (to be safe)
         const isStable = (id: string | null) => !!id && (id.startsWith('C') || id.startsWith('R')) && id.length > 30
 
         // Check LocalStorage for previously known Stable ID
         const storedStableId = localStorage.getItem('stableGroupId')
+        this.addLog(`[Store] Stored Stable ID: ${storedStableId}`)
 
         let finalId: string | null = null
 
         // 1. Highest Priority: Stable ID from URL (provided by Bot)
         if (isStable(qId)) {
           finalId = qId
-          console.log('[User Store] ✅ Using Stable Group ID from URL:', finalId)
-          // Persist it!
+          this.addLog(`[Store] ✅ Priority 1: Stable ID from URL: ${finalId}`)
           localStorage.setItem('stableGroupId', finalId)
         }
         // 2. Second Priority: Stable ID from Native Context
         else if (isStable(cId)) {
           finalId = cId!
-          console.log('[User Store] ✅ Using Stable Group ID from Native Context:', finalId)
-          // Persist it!
+          this.addLog(`[Store] ✅ Priority 2: Stable ID from Context: ${finalId}`)
           localStorage.setItem('stableGroupId', finalId)
         }
         // 3. Recovery Priority: Previously stored Stable ID (if current context is unstable)
         else if (storedStableId && isValidGroupId(cId)) { // If we are in *some* group context
           finalId = storedStableId
-          console.log('[User Store] ♻️ Restored Stable Group ID from Storage:', finalId)
+          this.addLog(`[Store] ♻️ Priority 3: Restored from Storage: ${finalId}`)
         }
         // 4. Third Priority: Unstable UUID from Context (Last Resort)
         else if (isValidGroupId(cId)) {
           finalId = cId
-          console.log('[User Store] ⚠️ Using Potentially Unstable UUID from Context:', finalId)
+          this.addLog(`[Store] ⚠️ Priority 4: Unstable UUID: ${finalId}`)
         }
         // 5. Fallback: Any valid format from URL
         else if (isValidGroupId(qId)) {
           finalId = qId
-          console.log('[User Store] ⚠️ Using ID from URL Fallback:', finalId)
+          this.addLog(`[Store] ⚠️ Priority 5: Fallback URL ID: ${finalId}`)
         }
 
         this.groupId = finalId
