@@ -48,13 +48,22 @@
                <summary class="cursor-pointer hover:text-teal-600 font-bold mb-1 select-none">
                    🐞 除錯資訊 (點擊展開): {{ userStore.groupId || 'Null' }}
                </summary>
-               <div class="space-y-1 p-2 bg-gray-100 dark:bg-black/20 rounded border border-gray-200 dark:border-gray-700">
+               <div class="space-y-2 p-2 bg-gray-100 dark:bg-black/20 rounded border border-gray-200 dark:border-gray-700">
                    <p>Group ID: {{ userStore.groupId }}</p>
-                   <p>ID 格式是否正確: <span :class="isIdValid ? 'text-green-500' : 'text-red-500'">{{ isIdValid ? '正確' : '錯誤 (UUID/無效)' }}</span></p>
-                   <p>Is Admin: {{ isAdmin }}</p>
+                   <p>ID 格式是否正確: <span :class="isIdValid ? 'text-green-500' : 'text-red-500'">{{ isIdValid ? '正確' : '錯誤 (UUID 36字元或 C/R 33字元)' }}</span></p>
                    <p>Context Type: {{ userStore.debugInfo?.type || 'None' }}</p>
-                   <p>View Type: {{ userStore.debugInfo?.viewType || 'None' }}</p>
-                   <pre>{{ JSON.stringify(userStore.debugInfo, null, 2) }}</pre>
+                   <p>Raw Context: <pre class="text-[10px]">{{ JSON.stringify(userStore.debugInfo?.rawContext, null, 2) }}</pre></p>
+                   
+                   <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
+                       <p class="font-bold text-teal-600 mb-1">🔗 群組映射工具 (修復推播)</p>
+                       <p class="text-[9px] mb-2 text-gray-400">如果機器人無法發送訊息，請輸入該群組真正的 LINE ID (C...) 並點擊同步。</p>
+                       <div class="flex gap-2">
+                           <input type="text" v-model="manualRealGroupId" placeholder="請輸入 C 開頭的真實 ID" 
+                               class="flex-1 p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+                           />
+                           <button @click="handleManualSync" class="bg-teal-600 text-white px-2 py-1 rounded hover:bg-teal-700">同步</button>
+                       </div>
+                   </div>
                </div>
            </details>
        </div>
@@ -243,8 +252,35 @@ const isAdmin = computed(() => userStore.isAdmin)
 const isIdValid = computed(() => {
     const id = userStore.groupId
     if (!id) return false
-    return /^[CR][0-9a-f]{32}$/i.test(id) || id.startsWith('mock-')
+    return /^([CR][0-9a-fA-F]{32}|[0-9a-fA-F-]{36})$/i.test(id) || id.startsWith('mock-')
 })
+
+const manualRealGroupId = ref('')
+const handleManualSync = async () => {
+    if (!manualRealGroupId.value) return
+    const idRegex = /^[CR][0-9a-f]{32}$/i
+    if (!idRegex.test(manualRealGroupId.value)) {
+        alert('請輸入正確的 LINE ID 格式 (C 或 R 開頭共 33 字元)')
+        return
+    }
+
+    try {
+        const res = await $fetch('/api/admin/sync-group-mapping', {
+            method: 'POST',
+            body: {
+                liffGroupId: userStore.groupId,
+                realGroupId: manualRealGroupId.value
+            }
+        })
+        if (res.success) {
+            alert('🚀 同步成功！機器人現在可以正確發送推播到此群組。')
+            manualRealGroupId.value = ''
+        }
+    } catch (e: any) {
+        alert('❌ 同步失敗：' + (e.data?.statusMessage || e.message))
+    }
+}
+
 const saving = ref(false)
 const savingSettings = ref(false) // New state for settings save
 const status = computed(() => scheduleStore.status)

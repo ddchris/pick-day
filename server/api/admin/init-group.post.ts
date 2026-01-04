@@ -7,7 +7,9 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   const { groupId } = body
 
-  if (!groupId || !/^[CR][0-9a-f]{32}$/.test(groupId) && !groupId.startsWith('mock-')) {
+  // Validation: Check if groupId is in a valid format (C/R + 32 chars OR UUID 36 chars)
+  const groupIdRegex = /^([CR][0-9a-fA-F]{32}|[0-9a-fA-F-]{36})$/i
+  if (!groupId || (!groupIdRegex.test(groupId) && !groupId.startsWith('mock-'))) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Invalid or missing groupId format',

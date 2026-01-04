@@ -129,19 +129,32 @@ export default defineEventHandler(async (event) => {
       }, { merge: true })
 
       // B. Push Notification
+      // 1. Resolve Real Group ID (The ID in Firestore might be a UUID)
+      let realTargetId = groupId
+      try {
+        const mapperSnap = await db.collection('groupMappers').doc(groupId).get()
+        if (mapperSnap.exists) {
+          realTargetId = mapperSnap.data()?.realGroupId || groupId
+          console.log(`[Cron] Map UUID ${groupId} -> Real ${realTargetId}`)
+        }
+      } catch (err) {
+        console.warn(`[Cron] Mapper lookup failed for ${groupId}`, err)
+      }
+
       const pushData: PushEventData = {
         messageType: 'voting_open',
         openVoting: true,
-        month: targetMonthStr
-      }
+        month: targetMonthStr,
+        realGroupId: realTargetId // Pass real ID for link generation
+      } as any
       const messages = buildPushMessages(pushData)
 
       try {
-        await client.pushMessage({ to: groupId, messages: messages as any })
-        results.push(`[${groupId}] OPENED voting for ${targetMonthStr}`)
+        await client.pushMessage({ to: realTargetId, messages: messages as any })
+        results.push(`[${groupId}] OPENED voting for ${targetMonthStr} (Pushed to ${realTargetId})`)
       } catch (e: any) {
-        console.error(`Failed to push to ${groupId}`, e)
-        results.push(`[${groupId}] OPENED (Push Failed)`)
+        console.error(`Failed to push to ${realTargetId}`, e)
+        results.push(`[${groupId}] OPENED (Push Failed for ${realTargetId})`)
       }
 
     } else if (status === 'CLOSED' && currentStatus === 'open') {
@@ -203,18 +216,31 @@ export default defineEventHandler(async (event) => {
       })
 
       // Push Notification
+      // Resolve Real Group ID
+      let realTargetId = groupId
+      try {
+        const mapperSnap = await db.collection('groupMappers').doc(groupId).get()
+        if (mapperSnap.exists) {
+          realTargetId = mapperSnap.data()?.realGroupId || groupId
+          console.log(`[Cron] Map UUID ${groupId} -> Real ${realTargetId}`)
+        }
+      } catch (err) {
+        console.warn(`[Cron] Mapper lookup failed for ${groupId}`, err)
+      }
+
       const pushData: PushEventData = {
         messageType: 'voting_closure',
-        topDates: top2
-      }
+        topDates: top2,
+        realGroupId: realTargetId
+      } as any
       const messages = buildPushMessages(pushData)
 
       try {
-        await client.pushMessage({ to: groupId, messages: messages as any })
-        results.push(`[${groupId}] CLOSED & Announced Top 2`)
+        await client.pushMessage({ to: realTargetId, messages: messages as any })
+        results.push(`[${groupId}] CLOSED & Announced Top 2 (Pushed to ${realTargetId})`)
       } catch (e: any) {
-        console.error(`Failed to push to ${groupId}`, e)
-        results.push(`[${groupId}] CLOSED (Push Failed)`)
+        console.error(`Failed to push to ${realTargetId}`, e)
+        results.push(`[${groupId}] CLOSED (Push Failed for ${realTargetId})`)
       }
     } else {
       results.push(`[${groupId}] No change (Status: ${currentStatus || 'new'}, Need: ${status})`)

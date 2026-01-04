@@ -96,11 +96,11 @@ export const useUserStore = defineStore('user', {
           rawContext: context // Keep full object for deep debug
         }
 
-        // Helper to validate LINE Group IDs
+        // Helper to validate LINE Group IDs (Could be C/R + 32 hex OR a 36-char UUID)
         const isValidGroupId = (id: string | null) => {
           if (!id) return false
-          // LINE Group IDs start with C (group) or R (room), followed by hash. Mock IDs are allowed for dev.
-          return /^[CR][0-9a-fA-F]{32}$/i.test(id) || id.startsWith('mock-')
+          // Mock IDs are allowed for dev
+          return /^([CR][0-9a-fA-F]{32}|[0-9a-fA-F-]{36})$/i.test(id) || id.startsWith('mock-')
         }
 
         // Set GroupId
@@ -125,6 +125,17 @@ export const useUserStore = defineStore('user', {
             this.groupId = qId
             console.log('[User Store] ✅ Group ID set from valid URL Query:', this.groupId)
           }
+        }
+
+        // --- ID MAPPING SYNC ---
+        // If we have both a UUID from context AND a real ID from URL, sync them!
+        const qId = route.query.groupId as string
+        if (detectedId && qId && detectedId !== qId && isValidGroupId(detectedId) && isValidGroupId(qId)) {
+          console.log('[User Store] 🔄 Detected ID mismatch. Syncing UUID -> Real ID mapping...')
+          $fetch('/api/admin/sync-group-mapping', {
+            method: 'POST',
+            body: { liffGroupId: detectedId, realGroupId: qId }
+          }).catch(err => console.error('[User Store] Sync Mapping Failed:', err))
         }
 
         this.idToken = liff.getIDToken()
