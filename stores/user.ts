@@ -104,7 +104,23 @@ export const useUserStore = defineStore('user', {
         }
 
         // --- ID DETECTION LOGIC (Strict Priority) ---
-        const qId = route.query.groupId as string
+        // 1. Try Nuxt Route Query
+        let qId = route.query.groupId as string
+
+        // 2. Fallback: Manual URL Parsing (window.location)
+        if (!qId && typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search)
+          qId = urlParams.get('groupId') as string
+          if (!qId) {
+            // Try Hash params just in case
+            const hash = window.location.hash
+            if (hash.includes('?')) {
+              const hashParams = new URLSearchParams(hash.split('?')[1])
+              qId = hashParams.get('groupId') as string
+            }
+          }
+        }
+
         const cId = context?.groupId || context?.roomId || null
 
         // Relaxed Check: Just C/R + length > 30 (to be safe)

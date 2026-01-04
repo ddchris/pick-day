@@ -53,6 +53,11 @@
                    <p>ID 格式是否正確: <span :class="isIdValid ? 'text-green-500' : 'text-red-500'">{{ isIdValid ? '正確' : '錯誤 (UUID 36字元或 C/R 33字元)' }}</span></p>
                    <p>Context Type: {{ userStore.debugInfo?.type || 'None' }}</p>
                    <p>Raw Context: <pre class="text-[10px]">{{ JSON.stringify(userStore.debugInfo?.rawContext, null, 2) }}</pre></p>
+                   <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                       <p class="font-bold text-gray-500">🔍 URL Debug:</p>
+                       <p class="break-all">{{ currentUrl }}</p>
+                       <p class="break-all text-blue-500">Query: {{ JSON.stringify(userStore.debugInfo?.routeQuery) }}</p>
+                   </div>
                    
                    <div class="pt-2 border-t border-gray-200 dark:border-gray-700">
                        <p class="font-bold text-teal-600 mb-1">🔗 群組映射工具 (修復推播)</p>
@@ -254,8 +259,15 @@ const isIdValid = computed(() => {
     if (!id) return false
     return /^([CR][0-9a-fA-F]{32}|[0-9a-fA-F-]{36})$/i.test(id) || id.startsWith('mock-')
 })
-
+const generatedLink = ref('')
 const manualRealGroupId = ref('')
+const currentUrl = ref('')
+
+onMounted(() => {
+    if (typeof window !== 'undefined') {
+        currentUrl.value = window.location.href
+    }
+})
 const handleManualSync = async () => {
     if (!manualRealGroupId.value) return
     const idRegex = /^[CR][0-9a-f]{32}$/i
