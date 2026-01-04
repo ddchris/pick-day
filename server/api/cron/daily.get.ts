@@ -43,208 +43,154 @@ export default defineEventHandler(async (event) => {
   const db = getFirestore(app)
   const client = new messagingApi.MessagingApiClient({ channelAccessToken: config.lineChannelAccessToken })
 
-  // 2. Iterate Groups
-  const groupsSnap = await db.collection('groups').get()
+  // 2. Fetch Single Active Group (Latest Group Strategy)
+  const latestGroupDoc = await db.collection('system').doc('latestGroup').get()
   const results: string[] = []
 
-  const now = new Date()
-  // Force set timezone to Taipei for calculation correctness if server is UTC?
-  // The util uses `now.getDate()` which depends on system local time.
-  // Vercel handles requests in UTC. We MUST adjust `now` to Taipei.
-  // Add 8 hours? simple offset.
-  const taipeiTime = new Date(now.getTime() + (8 * 60 * 60 * 1000))
-  // Wait, `new Date()` create UTC timestamp. `getDate()` returns day of month in local time.
-  // To be safe, let's use `toLocaleString` -> new Date hacks or just simple offset.
-  // Proper way:
-  const taipeiFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Taipei', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric' })
-  // Actually our helper expects a Date object and calls .getDate().
-  // We should pass a Date object that *represents* the time in Taipei.
-  // e.g. if it is 16:00 UTC (00:00 Taipei), we want the date obj to say "check for day X".
-  // Let's rely on the helper receiving a Date where .getDate() returns the Taipei day.
-  // `new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))` usually works in Node.
+  if (!latestGroupDoc.exists) {
+    return { success: true, summary: ['No active group found in system/latestGroup'] }
+  }
 
+  const settings = latestGroupDoc.data()
+  const groupId = settings?.groupId
+
+  if (!groupId || !settings?.autoVoteStartDay || !settings?.autoVoteEndDay) {
+    return { success: true, summary: ['Active group missing schedule settings or ID'] }
+  }
+
+  // --- Process Single Group ---
+
+  const now = new Date()
+  // Force set timezone to Taipei
   const checkDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
   const currentYear = checkDate.getFullYear()
   const currentMonth = checkDate.getMonth() + 1 // 1-12
 
-  for (const groupDoc of groupsSnap.docs) {
-    const groupId = groupDoc.id
-    const settings = groupDoc.data()
+  // 3. Determine Expected Status
+  const status = getVotingPeriodStatus(checkDate, settings.autoVoteStartDay, settings.autoVoteEndDay)
 
-    if (!settings.autoVoteStartDay || !settings.autoVoteEndDay) {
-      results.push(`[${groupId}] Skipped (No Schedule Settings)`)
-      continue
+  // 4. Check Current DB Status
+  let targetMonthForId = currentMonth + 1
+  let targetYearForId = currentYear
+
+  const start = settings.autoVoteStartDay
+  const end = settings.autoVoteEndDay
+  const currentDay = checkDate.getDate()
+
+  // Cross-month logic
+  if (start > end && currentDay <= end) {
+    targetMonthForId = currentMonth
+  }
+
+  if (targetMonthForId > 12) {
+    targetMonthForId = 1
+    targetYearForId++
+  }
+
+  // Strict Group Isolation
+  const scheduleId = `${groupId}_${targetYearForId}${String(targetMonthForId).padStart(2, '0')}`
+  const scheduleRef = db.collection('monthlySchedules').doc(scheduleId)
+  const scheduleSnap = await scheduleRef.get()
+  const scheduleData = scheduleSnap.exists ? scheduleSnap.data() : null
+
+  const currentStatus = scheduleData?.status // 'open' | 'closed' | undefined
+
+  // 5. Compare and Act
+  if (status === 'OPEN' && currentStatus !== 'open') {
+    // ACTION: OPEN VOTING
+    const targetMonthStr = `${targetYearForId}/${String(targetMonthForId).padStart(2, '0')}`
+
+    await scheduleRef.set({
+      groupId,
+      month: String(targetMonthForId).padStart(2, '0'),
+      status: 'open',
+      updatedAt: Date.now(),
+      events: scheduleData?.events || {},
+      votes: scheduleData?.votes || {}
+    }, { merge: true })
+
+    // Single Group Mode: Real ID is the groupId itself (trusted from server)
+    const realTargetId = groupId
+
+    // ... (Push Notification Logic remains similar) ...
+    const pushData: PushEventData = {
+      messageType: 'voting_open',
+      openVoting: true,
+      month: targetMonthStr,
+      realGroupId: realTargetId
+    } as any
+    const messages = buildPushMessages(pushData)
+
+    try {
+      await client.pushMessage({ to: realTargetId, messages: messages as any })
+      results.push(`[${groupId}] OPENED voting for ${targetMonthStr}`)
+    } catch (e: any) {
+      console.error(`Failed to push to ${realTargetId}`, e)
+      results.push(`[${groupId}] OPENED (Push Failed)`)
     }
 
-    // 3. Determine Expected Status
-    // Logic: passed Date must have correct .getDate()
-    const status = getVotingPeriodStatus(checkDate, settings.autoVoteStartDay, settings.autoVoteEndDay)
+  } else if (status === 'CLOSED' && currentStatus === 'open') {
+    // ACTION: CLOSE VOTING & ANNOUNCE
+    const votes = scheduleData?.votes || {}
 
-    // 4. Check Current DB Status
-    // Logic: Calculate accurate Target Month based on voting configuration
-    // Standard (Jan 25 -> Feb 1-28): Target is Current + 1
-    // Cross-Month Overlap (Feb 5, Start 25 End 5): We are finishing the vote for Feb.
-    // If we strictly used Current + 1 on Feb 5, we'd look for March (Wrong).
+    interface VoteInfo { date: string, count: number, participants: string[] }
+    const candidates: VoteInfo[] = []
 
-    let targetMonthForId = currentMonth + 1
-    let targetYearForId = currentYear
-
-    const start = settings.autoVoteStartDay
-    const end = settings.autoVoteEndDay
-    const currentDay = checkDate.getDate()
-
-    // If config is cross-month (Start > End) AND we are in the beginning of the month (Day <= End)
-    // Then we are actually finalizing the vote for *this* month.
-    if (start > end && currentDay <= end) {
-      targetMonthForId = currentMonth
+    for (const [dateStr, voteData] of Object.entries(votes)) {
+      const v = voteData as any
+      const userIds = v.o_users || []
+      if (userIds.length >= 3) {
+        candidates.push({
+          date: dateStr,
+          count: userIds.length,
+          participants: userIds
+        })
+      }
     }
 
-    if (targetMonthForId > 12) {
-      targetMonthForId = 1
-      targetYearForId++
+    candidates.sort((a, b) => b.count - a.count)
+    const top2 = candidates.slice(0, 2)
+
+    if (top2.length === 0) {
+      await scheduleRef.update({ status: 'closed', updatedAt: Date.now() })
+      results.push(`[${groupId}] CLOSED (No candidates)`)
+      return { success: true, summary: results }
     }
 
-    // Strict Group Isolation: The ID is prefixed with groupId
-    const scheduleId = `${groupId}_${targetYearForId}${String(targetMonthForId).padStart(2, '0')}`
-    const scheduleRef = db.collection('monthlySchedules').doc(scheduleId)
-    const scheduleSnap = await scheduleRef.get()
-    const scheduleData = scheduleSnap.exists ? scheduleSnap.data() : null
-
-    const currentStatus = scheduleData?.status // 'open' | 'closed' | undefined
-
-    // 5. Compare and Act
-    if (status === 'OPEN' && currentStatus !== 'open') {
-      // ACTION: OPEN VOTING
-      const targetMonthStr = `${targetYearForId}/${String(targetMonthForId).padStart(2, '0')}`
-
-      // A. Update DB
-      await scheduleRef.set({
-        groupId,
-        month: String(targetMonthForId).padStart(2, '0'),
-        status: 'open',
-        updatedAt: Date.now(),
-        // Initialize if new
-        events: scheduleData?.events || {},
-        votes: scheduleData?.votes || {}
-      }, { merge: true })
-
-      // B. Push Notification
-      // 1. Resolve Real Group ID (The ID in Firestore might be a UUID)
-      let realTargetId = groupId
-      try {
-        const mapperSnap = await db.collection('groupMappers').doc(groupId).get()
-        if (mapperSnap.exists) {
-          realTargetId = mapperSnap.data()?.realGroupId || groupId
-          console.log(`[Cron] Map UUID ${groupId} -> Real ${realTargetId}`)
-        }
-      } catch (err) {
-        console.warn(`[Cron] Mapper lookup failed for ${groupId}`, err)
+    // Resolve Names
+    for (const cand of top2) {
+      const names: string[] = []
+      for (const uid of cand.participants) {
+        const userSnap = await db.collection('users').doc(uid).get()
+        if (userSnap.exists) names.push(userSnap.data()?.displayName || '未知')
+        else names.push('未知')
       }
-
-      const pushData: PushEventData = {
-        messageType: 'voting_open',
-        openVoting: true,
-        month: targetMonthStr,
-        realGroupId: realTargetId // Pass real ID for link generation
-      } as any
-      const messages = buildPushMessages(pushData)
-
-      try {
-        await client.pushMessage({ to: realTargetId, messages: messages as any })
-        results.push(`[${groupId}] OPENED voting for ${targetMonthStr} (Pushed to ${realTargetId})`)
-      } catch (e: any) {
-        console.error(`Failed to push to ${realTargetId}`, e)
-        results.push(`[${groupId}] OPENED (Push Failed for ${realTargetId})`)
-      }
-
-    } else if (status === 'CLOSED' && currentStatus === 'open') {
-      // ACTION: CLOSE VOTING & ANNOUNCE
-      // Need to calculate winners... 
-      // This is complex backend logic usually in Vue.
-      // We need to fetch votes, count them, sort them.
-
-      const votes = scheduleData?.votes || {}
-      const events = [] // We need targets to map dates... 
-      // Generating targets server-side without the helper that uses simple holidays.json might be tricky if holidays.json is client-side.
-      // However, `date-helper.ts` is shared. But `holidays.json` file access?
-      // Since we're closing, we only care about dates that HAVE votes.
-      // We can just iterate the `votes` map keys!
-
-      interface VoteInfo { date: string, count: number, participants: string[] }
-      const candidates: VoteInfo[] = []
-
-      for (const [dateStr, voteData] of Object.entries(votes)) {
-        const v = voteData as any
-        const userIds = v.o_users || []
-        if (userIds.length >= 3) {
-          candidates.push({
-            date: dateStr,
-            count: userIds.length,
-            participants: userIds // IDs only for now, fetch names?
-          })
-        }
-      }
-
-      // Sort
-      candidates.sort((a, b) => b.count - a.count)
-      const top2 = candidates.slice(0, 2)
-
-      if (top2.length === 0) {
-        // Nothing to announce really, just close.
-        await scheduleRef.update({ status: 'closed', updatedAt: Date.now() })
-        results.push(`[${groupId}] CLOSED (No candidates)`)
-        continue
-      }
-
-      // Resolve Names (Expensive? Limit to Top 2)
-      for (const cand of top2) {
-        const names: string[] = []
-        for (const uid of cand.participants) {
-          const userSnap = await db.collection('users').doc(uid).get()
-          if (userSnap.exists) names.push(userSnap.data()?.displayName || '未知')
-          else names.push('未知')
-        }
-        cand.participants = names
-      }
-
-      // Update DB
-      await scheduleRef.update({
-        status: 'closed',
-        updatedAt: Date.now(),
-        // We don't auto-write finalEvent description here as that's for Admins to edit.
-        // But we can notify.
-      })
-
-      // Push Notification
-      // Resolve Real Group ID
-      let realTargetId = groupId
-      try {
-        const mapperSnap = await db.collection('groupMappers').doc(groupId).get()
-        if (mapperSnap.exists) {
-          realTargetId = mapperSnap.data()?.realGroupId || groupId
-          console.log(`[Cron] Map UUID ${groupId} -> Real ${realTargetId}`)
-        }
-      } catch (err) {
-        console.warn(`[Cron] Mapper lookup failed for ${groupId}`, err)
-      }
-
-      const pushData: PushEventData = {
-        messageType: 'voting_closure',
-        topDates: top2,
-        realGroupId: realTargetId
-      } as any
-      const messages = buildPushMessages(pushData)
-
-      try {
-        await client.pushMessage({ to: realTargetId, messages: messages as any })
-        results.push(`[${groupId}] CLOSED & Announced Top 2 (Pushed to ${realTargetId})`)
-      } catch (e: any) {
-        console.error(`Failed to push to ${realTargetId}`, e)
-        results.push(`[${groupId}] CLOSED (Push Failed for ${realTargetId})`)
-      }
-    } else {
-      results.push(`[${groupId}] No change (Status: ${currentStatus || 'new'}, Need: ${status})`)
+      cand.participants = names
     }
+
+    // Update DB
+    await scheduleRef.update({
+      status: 'closed',
+      updatedAt: Date.now()
+    })
+
+    // Push Notification
+    const pushData: PushEventData = {
+      messageType: 'voting_closure',
+      topDates: top2,
+      realGroupId: groupId
+    } as any
+    const messages = buildPushMessages(pushData)
+
+    try {
+      await client.pushMessage({ to: groupId, messages: messages as any })
+      results.push(`[${groupId}] CLOSED & Announced Top 2`)
+    } catch (e: any) {
+      console.error(`Failed to push to ${groupId}`, e)
+      results.push(`[${groupId}] CLOSED (Push Failed)`)
+    }
+  } else {
+    results.push(`[${groupId}] No change (Status: ${currentStatus || 'new'}, Need: ${status})`)
   }
 
   return {
