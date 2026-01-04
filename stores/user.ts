@@ -126,18 +126,13 @@ export const useUserStore = defineStore('user', {
           console.warn('[User Store] No Group/Room ID detected in context')
         }
 
-        // Fetch Real Group ID fallback (e.g. External Browser)
+        // NO FALLBACK to database mapping.
+        // We only trust the current context.
         if (!this.groupId && this.profile?.userId) {
-          // 1. Check URL Query Param
           const qId = route.query.groupId as string
           if (qId && isValidGroupId(qId)) {
             this.groupId = qId
             console.log('[User Store] Group ID set from valid URL Query:', this.groupId)
-          }
-          // 2. Fallback to webhook mapping
-          else {
-            console.log('[User Store] Attempting to fetch from webhook mapping...')
-            await this.fetchRealGroupId(this.profile.userId)
           }
         }
 
@@ -229,34 +224,6 @@ export const useUserStore = defineStore('user', {
         } catch (error) {
           console.log('Group admin check failed:', error)
         }
-      }
-    },
-
-    async fetchRealGroupId(userId: string) {
-      try {
-        console.log('[User Store] Fetching real Group ID for user:', userId)
-
-        const { db } = useNuxtApp().$firebase
-        const { doc, getDoc } = await import('firebase/firestore')
-        const mappingRef = doc(db, 'userGroupMappings', userId)
-        const snap = await getDoc(mappingRef)
-
-        if (snap.exists()) {
-          const realGroupId = snap.data().groupId
-          console.log('[User Store] ✅ Real Group ID found from webhook:', realGroupId)
-
-          if (realGroupId && (realGroupId.startsWith('C') || realGroupId.startsWith('R') || realGroupId.startsWith('mock-'))) {
-            this.groupId = realGroupId
-            console.log('[User Store] Updated groupId to verified ID:', this.groupId)
-          } else {
-            console.warn('[User Store] Mapping found but ID format is invalid:', realGroupId)
-          }
-        } else {
-          console.log('[User Store] No webhook mapping found, current groupId:', this.groupId)
-        }
-      } catch (error) {
-        console.error('[User Store] Error fetching real Group ID:', error)
-        console.log('[User Store] Current groupId remained:', this.groupId)
       }
     }
   }

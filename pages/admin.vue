@@ -1,9 +1,14 @@
 <template>
   <div class="p-4 space-y-6 pb-24">
-    <h2 class="text-xl font-bold flex items-center gap-2">
-      <div class="i-carbon-settings text-gray-700 dark:text-gray-300"></div>
-      <span>活動設定 (管理員)</span>
-    </h2>
+     <h2 class="text-xl font-bold flex items-center justify-between">
+       <div class="flex items-center gap-2">
+           <div class="i-carbon-settings text-gray-700 dark:text-gray-300"></div>
+           <span>活動設定 (管理員)</span>
+       </div>
+       <div v-if="userStore.groupId && isIdValid" class="px-3 py-1 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 text-[10px] font-mono rounded-full border border-teal-200 dark:border-teal-800">
+           ID: {{ userStore.groupId }}
+       </div>
+     </h2>
 
     <div v-if="loading" class="text-center text-gray-400 py-10 flex flex-col items-center gap-2">
        <div class="i-carbon-circle-dash w-8 h-8 animate-spin text-teal-600"></div>
@@ -74,8 +79,8 @@
                   <div class="i-carbon-time text-xl"></div>
                   <span>自動排程設定</span>
               </div>
-              <button @click="saveGroupSettings" :disabled="savingSettings"
-                  class="text-xs bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+              <button @click="saveGroupSettings" :disabled="savingSettings || !isIdValid"
+                  class="text-xs bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                   <div v-if="savingSettings" class="i-carbon-circle-dash animate-spin"></div>
                   {{ savingSettings ? '儲存中' : '儲存設定' }}
@@ -395,13 +400,21 @@ onMounted(async () => {
         
         // 2. Reactive Subscription & Fetch Settings
         stopWatch = watch(() => userStore.groupId, async (newGroupId) => {
-            if (newGroupId && targets.length > 0) {
+            // 0. RESET State for new group context (Isolate data)
+            console.log('[Admin] groupId changed to:', newGroupId, 'Resetting UI state...')
+            groupSettings.autoVoteStartDay = null
+            groupSettings.autoVoteEndDay = null
+            Object.keys(forms).forEach(key => delete forms[key])
+            Object.keys(otherRemarks).forEach(key => delete otherRemarks[key])
+            winningDates.value = []
+            
+            if (!newGroupId || !isIdValid.value) {
+                 console.log('[Admin] groupId missing or invalid, skipping fetch.')
+                 return
+            }
+
+            if (targets.length > 0) {
                  console.log('[Admin] groupId detected:', newGroupId, 'Subscribing...')
-                 
-                 // RESET State for new group
-                 groupSettings.autoVoteStartDay = null
-                 groupSettings.autoVoteEndDay = null
-                 // Reset "otherRemarks" as well? Forms are re-synced by "events" watcher, but ensuring clean state is good.
                  
                  // Fetch Group Settings
                  const { db } = useNuxtApp().$firebase
@@ -425,8 +438,6 @@ onMounted(async () => {
                  const dateStrs = targets.map(d => d.dateStr)
                  await scheduleStore.subscribeToDates(newGroupId, dateStrs)
                  console.log('[Admin] Subscription done.')
-            } else {
-                console.log('[Admin] Waiting for groupId...')
             }
         }, { immediate: true })
 
