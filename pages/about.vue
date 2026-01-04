@@ -54,20 +54,19 @@ const start = ref(24)
 const end = ref(30)
 
 onMounted(async () => {
-    if (userStore.groupId) {
-        try {
-             const { db } = useNuxtApp().$firebase
-             const { doc, getDoc } = await import('firebase/firestore')
-             const groupSnap = await getDoc(doc(db, 'groups', userStore.groupId))
-             
-             if (groupSnap.exists()) {
-                 const d = groupSnap.data()
-                 if (d.autoVoteStartDay) start.value = d.autoVoteStartDay
-                 if (d.autoVoteEndDay) end.value = d.autoVoteEndDay
-             }
-        } catch (e) {
-            console.error('[About] Failed to load settings', e)
-        }
+    try {
+            const { db } = useNuxtApp().$firebase
+            const { doc, getDoc } = await import('firebase/firestore')
+            // Fetch Global Settings
+            const groupSnap = await getDoc(doc(db, 'system', 'latestGroup'))
+            
+            if (groupSnap.exists()) {
+                const d = groupSnap.data()
+                if (d.autoVoteStartDay) start.value = d.autoVoteStartDay
+                if (d.autoVoteEndDay) end.value = d.autoVoteEndDay
+            }
+    } catch (e) {
+        console.error('[About] Failed to load settings', e)
     }
 })
 </script>

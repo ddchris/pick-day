@@ -264,30 +264,31 @@ onMounted(async () => {
     const holidays = await fetchHolidays()
     targets.value = getNextMonthTargets(holidays)
     
-    // Helper to fetch settings
-    const loadGroupSettings = async (gid: string) => {
+    // Helper to fetch settings (Single Source of Truth)
+    const loadGroupSettings = async () => {
         try {
-             console.log('[Index] Loading settings for group:', gid)
              const { db } = useNuxtApp().$firebase
              const { doc, getDoc } = await import('firebase/firestore')
-             const groupSnap = await getDoc(doc(db, 'groups', gid))
+             // Always fetch from system/latestGroup as requested
+             const groupSnap = await getDoc(doc(db, 'system', 'latestGroup'))
              
              if (groupSnap.exists()) {
                  const d = groupSnap.data()
-                 console.log('[Index] Group settings found:', d)
-                 // Use assignment to keep reactivity
+                 console.log('[Index] Loaded Global Settings:', d)
+                 
+                 // Update ID to match the active group
+                 if (d.groupId && d.groupId !== userStore.groupId) {
+                     console.log('[Index] Switching to active group:', d.groupId)
+                     userStore.groupId = d.groupId
+                 }
+
                  groupSettings.start = d.autoVoteStartDay || 24
                  groupSettings.end = d.autoVoteEndDay || 30
              } else {
-                 console.log('[Index] No group settings found, using default')
-                 groupSettings.start = 24
-                 groupSettings.end = 30
+                 console.log('[Index] No active group settings found')
              }
         } catch (e) {
             console.error('[Index] Failed to load group settings:', e)
-            // Fallback on error
-            groupSettings.start = 24
-            groupSettings.end = 30
         } finally {
             settingsLoaded.value = true
         }
@@ -295,7 +296,7 @@ onMounted(async () => {
 
     // Subscribe if we have groupId
     if (userStore.groupId) {
-        await loadGroupSettings(userStore.groupId)
+        await loadGroupSettings()
         const dates = targets.value.map(d => d.dateStr)
         scheduleStore.subscribeToDates(userStore.groupId, dates)
     } 
@@ -303,7 +304,7 @@ onMounted(async () => {
     // Watch for groupId changes (init or change)
     watch(() => userStore.groupId, async (newVal) => {
         if (newVal) {
-             await loadGroupSettings(newVal)
+             await loadGroupSettings()
              const dates = targets.value.map(d => d.dateStr)
              scheduleStore.subscribeToDates(newVal, dates)
         }

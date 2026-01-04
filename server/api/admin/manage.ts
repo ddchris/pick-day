@@ -7,19 +7,11 @@ import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebas
  */
 export default defineEventHandler(async (event) => {
   const method = event.method
-  const query = getQuery(event)
-  const groupId = query.groupId as string
-
-  if (!groupId) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Missing groupId parameter',
-    })
-  }
 
   // Initialize Firebase Admin
   const { adminDb } = await import('~/server/utils/firebase')
-  const groupRef = adminDb.collection('groups').doc(groupId)
+  // STRICT MODE: Always target system/latestGroup
+  const groupRef = adminDb.collection('system').doc('latestGroup')
 
   if (method === 'GET') {
     // Get list of admins
@@ -29,6 +21,8 @@ export default defineEventHandler(async (event) => {
         const data = doc.data()
         return {
           adminIds: data?.adminIds || [],
+          // Return the actual Group ID this applies to, for client verification
+          groupId: data?.groupId
         }
       } else {
         return {
@@ -57,20 +51,10 @@ export default defineEventHandler(async (event) => {
       const doc = await groupRef.get()
 
       if (!doc.exists) {
-        // Create new group document with first admin
-        if (action === 'add') {
-          await groupRef.set({
-            adminIds: [userId],
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          })
-          return { success: true, message: 'Group created and admin added' }
-        } else {
-          throw createError({
-            statusCode: 404,
-            statusMessage: 'Group not found',
-          })
-        }
+        throw createError({
+          statusCode: 404,
+          statusMessage: 'No active group found. Invite bot first.',
+        })
       } else {
         // Update existing group
         const data = doc.data()
