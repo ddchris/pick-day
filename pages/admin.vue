@@ -255,7 +255,9 @@ const isIdValid = computed(() => {
     return /^([CR][0-9a-fA-F]{32}|[0-9a-fA-F-]{36})$/i.test(id) || id.startsWith('mock-')
 })
 
+const generatedLink = ref('')
 const manualRealGroupId = ref('')
+
 const handleManualSync = async () => {
     if (!manualRealGroupId.value) return
     const idRegex = /^[CR][0-9a-f]{32}$/i
@@ -265,7 +267,7 @@ const handleManualSync = async () => {
     }
 
     try {
-        const res = await $fetch('/api/admin/sync-group-mapping', {
+        const res = await $fetch<{ success: boolean; message?: string }>('/api/admin/sync-group-mapping', {
             method: 'POST',
             body: {
                 liffGroupId: userStore.groupId,
@@ -275,13 +277,21 @@ const handleManualSync = async () => {
         if (res.success) {
             // Update the store to the stable ID immediately
             userStore.groupId = manualRealGroupId.value
-            alert('🚀 同步成功！此頁面已自動鎖定至穩定 ID。現在您可以安全地保存設定，機器人也能正常發送推播了。')
-            manualRealGroupId.value = ''
-            // The watcher in admin.vue will automatically fetch data for the new groupId
+            
+            // Generate Permanent Link
+            const config = useRuntimeConfig()
+            const liffBase = `https://liff.line.me/${userStore.debugInfo?.liffId || ''}`
+            generatedLink.value = `${liffBase}?groupId=${manualRealGroupId.value}`
+
+            alert('🚀 同步成功！\n\n請務必複製下方的「永久固定連結」並設為公告或筆記，\n以後請「只透過該連結」進入，才能永久保存設定！')
         }
     } catch (e: any) {
         alert('❌ 同步失敗：' + (e.data?.statusMessage || e.message))
     }
+}
+const copyLink = () => {
+    navigator.clipboard.writeText(generatedLink.value)
+    alert('已複製連結！請貼到群組記事本保存。')
 }
 
 const saving = ref(false)
