@@ -39,47 +39,41 @@ export default defineEventHandler(async (event: H3Event) => {
       const groupId = webhookEvent.source.type === 'group' ? webhookEvent.source.groupId : null
       const userId = webhookEvent.source.userId
 
-      if (!groupId || !userId) {
-        console.log('[Webhook] Skipping - not a group event or no userId')
+      // Skip if likely invalid, BUT allow 'join' events which might not have userId in some contexts (though usually do, but let's be safe for the welcome message)
+      if (!groupId) {
+        console.log('[Webhook] Skipping - no groupId')
         continue
       }
 
-      console.log('[Webhook] ✅ Capturing Group ID mapping')
-      console.log('[Webhook] User ID:', userId)
+      if (!userId && webhookEvent.type !== 'join') {
+        console.log('[Webhook] Skipping - no userId (and not join event)')
+        continue
+      }
+
+      console.log('[Webhook] ✅ Processing Event')
       console.log('[Webhook] Group ID:', groupId)
 
       // 5. Store user-group mapping in Firestore
-      try {
-        const { adminDb } = await import('~/server/utils/firebase')
-        await adminDb.collection('userGroupMappings').doc(userId).set({
-          userId,
-          groupId,
-          updatedAt: new Date().getTime(),
-          eventType: webhookEvent.type
-        }, { merge: true })
+      if (userId) {
+        try {
+          const { adminDb } = await import('~/server/utils/firebase')
+          await adminDb.collection('userGroupMappings').doc(userId).set({
+            userId,
+            groupId,
+            updatedAt: new Date().getTime(),
+            eventType: webhookEvent.type
+          }, { merge: true })
 
-        console.log('[Webhook] ✅ Mapping saved to Firestore')
-      } catch (firestoreError: any) {
-        console.error('[Webhook] Firestore save error:', firestoreError)
+          console.log('[Webhook] ✅ Mapping saved to Firestore')
+        } catch (firestoreError: any) {
+          console.error('[Webhook] Firestore save error:', firestoreError)
+        }
       }
 
       const { messagingApi } = await import('@line/bot-sdk')
       const client = new messagingApi.MessagingApiClient({ channelAccessToken: config.lineChannelAccessToken })
 
-      // 6. ID Query Command (Helper for Admin)
-      if (webhookEvent.type === 'message' && webhookEvent.message.type === 'text') {
-        const text = webhookEvent.message.text.trim()
-        if (['查詢ID', '/id', 'id', 'ID'].includes(text) && groupId) {
-          await client.replyMessage({
-            replyToken: (webhookEvent as any).replyToken,
-            messages: [{
-              type: 'text',
-              text: `本群組的真實 ID 為：\n\n${groupId}\n\n請複製上方 ID (C開頭) 回到網頁進行同步。`
-            }]
-          })
-          return { status: 'success' }
-        }
-      }
+
 
       // 7. Welcome Message / Setup Link on 'join'
       if (webhookEvent.type === 'join' && groupId) {
