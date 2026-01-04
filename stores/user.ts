@@ -113,8 +113,16 @@ export const useUserStore = defineStore('user', {
 
         // Fetch Real Group ID only if we don't have one from LIFF (e.g. External Browser)
         if (!this.groupId && this.profile?.userId) {
-          console.log('[User Store] No Group ID from LIFF, attempting to fetch from webhook mapping...')
-          await this.fetchRealGroupId(this.profile.userId)
+          // 1. Check URL Query Param first (Highest priority for external links)
+          if (route.query.groupId) {
+            this.groupId = route.query.groupId as string
+            console.log('[User Store] Group ID set from URL Query:', this.groupId)
+          }
+          // 2. Fallback to webhook mapping
+          else {
+            console.log('[User Store] No Group ID from LIFF/URL, attempting to fetch from webhook mapping...')
+            await this.fetchRealGroupId(this.profile.userId)
+          }
         }
 
         this.idToken = liff.getIDToken()
