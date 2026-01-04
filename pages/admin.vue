@@ -301,10 +301,11 @@ const handleManualSync = async () => {
             // Update the store to the stable ID immediately
             userStore.groupId = manualRealGroupId.value
             
-            // Generate Permanent Link (Hash-based for robustness)
+            // Generate Permanent Link (liff.state-based for robustness)
             const config = useRuntimeConfig()
             const liffBase = `https://liff.line.me/${userStore.debugInfo?.liffId || ''}`
-            generatedLink.value = `${liffBase}/#groupId=${manualRealGroupId.value}`
+            const targetQuery = `?groupId=${manualRealGroupId.value}`
+            generatedLink.value = `${liffBase}/?liff.state=${encodeURIComponent(targetQuery)}`
 
             alert('🚀 同步成功！此頁面已自動鎖定至穩定 ID。現在您可以安全地保存設定，機器人也能正常發送推播了。')
             manualRealGroupId.value = ''
