@@ -76,7 +76,8 @@ export default defineEventHandler(async (event: H3Event) => {
         try {
           const { messagingApi } = await import('@line/bot-sdk')
           const client = new messagingApi.MessagingApiClient({ channelAccessToken: config.lineChannelAccessToken })
-          const setupLink = `https://liff.line.me/${config.public.liffId}?groupId=${groupId}`
+          // Use HASH instead of Query to avoid stripping issues
+          const setupLink = `https://liff.line.me/${config.public.liffId}/#groupId=${groupId}`
 
           await client.replyMessage({
             replyToken: (webhookEvent as any).replyToken,
