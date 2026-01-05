@@ -96,7 +96,7 @@ export default defineEventHandler(async (event: H3Event) => {
             replyToken: (webhookEvent as any).replyToken,
             messages: [{
               type: 'text',
-              text: `感謝邀請！我是挑日子機器人 📅\n\n已將本群組設為「目前管理群組」：\n${groupName}\n\n管理員請直接點擊下方連結進入設定：\n${setupLink}`
+              text: `大家好！我是挑日子機器人 📅\n已將本群 ${groupName} 設為「管理群組」\n日後將由我為您服務揪團事項\n敬請期待！`
             }]
           })
           console.log('[Webhook] Welcome message sent to', groupId)
