@@ -64,7 +64,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
                 type: 'uri',
                 label: '前往投票',
                 uri: useRuntimeConfig().public.liffId
-                  ? `https://liff.line.me/${useRuntimeConfig().public.liffId}?groupId=${(eventData as any).realGroupId || ''}`
+                  ? `https://liff.line.me/${useRuntimeConfig().public.liffId}`
                   : 'https://pick-day.vercel.app/'
               }
             }
