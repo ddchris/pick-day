@@ -2,27 +2,8 @@
 import { messagingApi } from '@line/bot-sdk'
 import { getVotingPeriodStatus } from '~/utils/date-helper'
 import { buildPushMessages, type PushEventData } from '~/server/utils/push-notifier'
-import { cert } from 'firebase-admin/app'
-import { getFirestore } from 'firebase-admin/firestore'
-import { initializeApp, getApps } from 'firebase-admin/app'
-
-// Initialize Admin SDK (if not already)
-// Note: In server routes, we might need to ensure this is shared or init here.
-// Reusing logic from firebase.server might be cleaner but for now explicit init is safer for Cron.
-// Actually, let's use the runtime config and standard init used elsewhere if available.
-// Assuming we can grab the service account from config.
-
-const initFirebaseAdmin = () => {
-  const apps = getApps()
-  if (apps.length) return apps[0]
-
-  const config = useRuntimeConfig()
-  const serviceAccount = JSON.parse(config.firebaseServiceAccount)
-
-  return initializeApp({
-    credential: cert(serviceAccount)
-  })
-}
+// Firebase initialization is handled by ~/server/utils/firebase
+// import { initFirebaseAdmin } from '~/server/utils/firebase' (Using direct export)
 
 export default defineEventHandler(async (event) => {
   // 1. Security Check
@@ -39,8 +20,8 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const app = initFirebaseAdmin()
-  const db = getFirestore(app)
+  // Use the shared adminDb which handles initialization robustly
+  const { adminDb: db } = await import('~/server/utils/firebase')
   const client = new messagingApi.MessagingApiClient({ channelAccessToken: config.lineChannelAccessToken })
 
   // 2. Fetch Single Active Group (Latest Group Strategy)

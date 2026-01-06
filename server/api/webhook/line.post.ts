@@ -86,7 +86,7 @@ export default defineEventHandler(async (event: H3Event) => {
             groupName: groupName,
             pictureUrl: pictureUrl,
             updatedAt: new Date().getTime()
-          })
+          }, { merge: true })
           console.log('[Webhook] ✅ Saved latestGroup to Firestore:', groupName)
 
           // C. Send Simple Welcome Message
