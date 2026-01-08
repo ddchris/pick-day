@@ -42,13 +42,19 @@ export default defineEventHandler(async (event) => {
   // --- Process Single Group ---
 
   const now = new Date()
+  
+  // SAFETY: Add 10 mins buffer to handle potential Cron drift (e.g. triggering at 23:59:59)
+  // This ensures that if the cron runs "at midnight", we fall firmly into the new day.
+  const bufferedTime = new Date(now.getTime() + 10 * 60 * 1000)
+
   // Force set timezone to Taipei
-  const checkDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
+  const checkDate = new Date(bufferedTime.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
   const currentYear = checkDate.getFullYear()
   const currentMonth = checkDate.getMonth() + 1 // 1-12
 
   // 3. Determine Expected Status
   const status = getVotingPeriodStatus(checkDate, settings.autoVoteStartDay, settings.autoVoteEndDay)
+  results.push(`[System] Check Date: ${checkDate.getDate()} (Taipei), Target Status: ${status}`)
 
   // 4. Check Current DB Status
   let targetMonthForId = currentMonth + 1
