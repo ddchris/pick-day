@@ -118,6 +118,18 @@
          <p class="text-[10px] text-gray-400 mt-1">
            將會：1. 計算前 2 名日期 2. 寫入 Admin 設定 3. 發送 LINE 通知名單
          </p>
+
+         <!-- Manual Cron Trigger -->
+         <button 
+           @click="triggerSystemCron"
+           :disabled="cronLoading"
+           class="w-full mt-6 px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 shadow-lg"
+         >
+            {{ cronLoading ? '系統檢查執行中...' : '⚡ 立即執行每日檢查 (Real Cron)' }}
+         </button>
+         <p class="text-[10px] text-orange-600/70 dark:text-orange-400/70 mt-1 font-bold">
+           ⚠️ 注意：這會執行伺服器真實邏輯 (含補發通知、關閉投票)
+         </p>
       </div>
     </div>
 
@@ -328,6 +340,22 @@ const scheduleStore = useScheduleStore()
 
 const simulating = ref(false)
 const opening = ref(false)
+const cronLoading = ref(false)
+
+const triggerSystemCron = async () => {
+    if (!confirm('確定要執行系統排程嗎？\n這會真實地檢查日期並可能關閉投票發送通知。')) return
+    
+    cronLoading.value = true
+    try {
+        const res: any = await $fetch('/api/admin/trigger-cron', { method: 'POST' })
+        alert('✅ 執行成功！\n\n---- 執行報告 ----\n' + (res.summary || []).join('\n'))
+    } catch (e: any) {
+        console.error(e)
+        alert('❌ 執行失敗: ' + e.message)
+    } finally {
+        cronLoading.value = false
+    }
+}
 
 const simulateOpenAndNotify = async () => {
     if (!userStore.groupId) {
