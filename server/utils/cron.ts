@@ -107,23 +107,45 @@ export async function runDailyCron() {
       results.push(`[${groupId}] OPENED (Push Failed)`)
     }
 
-  } else if (status === 'CLOSED' && currentStatus === 'open') {
     // ACTION: CLOSE VOTING & ANNOUNCE
-    const votes = scheduleData?.votes || {}
-
     interface VoteInfo { date: string, count: number, participants: string[] }
     const candidates: VoteInfo[] = []
-
-    for (const [dateStr, voteData] of Object.entries(votes)) {
-      const v = voteData as any
-      const userIds = v.o_users || []
-      if (userIds.length >= 3) {
-        candidates.push({
-          date: dateStr,
-          count: userIds.length,
-          participants: userIds
-        })
-      }
+    
+    // FETCH REAL VOTES FROM dateVotes COLLECTION
+    // We cannot trust scheduleData.votes (it is empty).
+    // We must iterate all days in the target month and fetch their vote docs.
+    
+    const daysInMonth = new Date(targetYearForId, targetMonthForId, 0).getDate()
+    const checkRefs = []
+    
+    // Prepare IDs to fetch
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${targetYearForId}-${String(targetMonthForId).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      // ID format from stores/schedule.ts: `${groupId}_${date.replace(/-/g, '')}`
+      // e.g. groupId_20260201
+      const voteId = `${groupId}_${dateStr.replace(/-/g, '')}`
+      checkRefs.push({ dateStr, ref: db.collection('dateVotes').doc(voteId) })
+    }
+    
+    // Execute Parallel Fetch (1-31 reads)
+    // Firestore allows parallel Await or usage of getAll if supported, but running Promise.all is compliant.
+    const snapshots = await Promise.all(checkRefs.map(item => item.ref.get()))
+    
+    for (let i = 0; i < snapshots.length; i++) {
+        const snap = snapshots[i]
+        const { dateStr } = checkRefs[i]
+        
+        if (snap.exists) {
+            const data = snap.data()
+            const userIds = data?.o_users || []
+            if (userIds.length >= 3) {
+                candidates.push({
+                  date: dateStr,
+                  count: userIds.length,
+                  participants: userIds
+                })
+            }
+        }
     }
 
     candidates.sort((a, b) => b.count - a.count)
@@ -131,7 +153,7 @@ export async function runDailyCron() {
 
     if (top2.length === 0) {
       await scheduleRef.update({ status: 'closed', updatedAt: Date.now() })
-      results.push(`[${groupId}] CLOSED (No candidates)`)
+      results.push(`[${groupId}] CLOSED (No candidates found in ${checkRefs.length} days checked)`)
       return { success: true, summary: results }
     }
 
@@ -153,15 +175,15 @@ export async function runDailyCron() {
     })
 
     // Push Notification
-    const pushData: PushEventData = {
+    const closurePushData: PushEventData = {
       messageType: 'voting_closure',
       topDates: top2,
       realGroupId: groupId
     } as any
-    const messages = buildPushMessages(pushData)
+    const closureMessages = buildPushMessages(closurePushData)
 
     try {
-      await client.pushMessage({ to: groupId, messages: messages as any })
+      await client.pushMessage({ to: groupId, messages: closureMessages as any })
       results.push(`[${groupId}] CLOSED & Announced Top 2`)
     } catch (e: any) {
       console.error(`Failed to push to ${groupId}`, e)
