@@ -41,31 +41,64 @@ export default defineEventHandler(async (event) => {
 
   // --- Process Single Group ---
 
-  const now = new Date()
+  // --- Timezone Robustness Fix ---
+  // Instead of relying on toLocaleString (which depends on OS/Node ICU data),
+  // we manually shift the UTC timestamp by +8 hours (Taipei).
+  // We also keep the +10 min buffer for cron drift safety.
   
-  // SAFETY: Add 10 mins buffer to handle potential Cron drift (e.g. triggering at 23:59:59)
-  // This ensures that if the cron runs "at midnight", we fall firmly into the new day.
-  const bufferedTime = new Date(now.getTime() + 10 * 60 * 1000)
-
-  // Force set timezone to Taipei
-  const checkDate = new Date(bufferedTime.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }))
-  const currentYear = checkDate.getFullYear()
-  const currentMonth = checkDate.getMonth() + 1 // 1-12
-
+  const TPE_OFFSET = 8 * 60 * 60 * 1000
+  const BUFFER = 10 * 60 * 1000
+  
+  const now = new Date()
+  const shiftedTime = new Date(now.getTime() + TPE_OFFSET + BUFFER)
+  
+  // Use getUTC* methods on the shifted time to get "Taipei Local Time" components
+  const currentYear = shiftedTime.getUTCFullYear()
+  const currentMonth = shiftedTime.getUTCMonth() + 1
+  const currentDay = shiftedTime.getUTCDate() // This is the safe "Taipei Day"
+  
+  // Reconstruct a local Date object for helper functions if needed, 
+  // ensuring we pass the components explicitly or update the helper to accept numbers.
+  // getVotingPeriodStatus expects a Date object and calls .getDate() on it.
+  // To be safe, we'll pass a constructed Date that "looks like" Taipei time in local representation
+  // just for the helper, OR better, update the helper call to just use the day number?
+  // The helper `getVotingPeriodStatus` signature: (now = new Date(), ...)
+  // It calls `now.getDate()`.
+  // So we need to create a Date object where .getDate() returns `currentDay`.
+  // If we assume Vercel is UTC, `shiftedTime.getDate()` == `currentDay` (if shiftedTime is constructed from UTC ts).
+  // YES: new Date(timestamp) creates a date. .getUTCDate() returns the shifted components.
+  // But .getDate() returns server-local components. If Server is UTC, .getDate() === .getUTCDate().
+  // If Server is NOT UTC (rare in cloud but possible), this risks error.
+  
+  // Strategy: Create a "Fake Date" where the internal UTC timestamp ALIGNS with Taipei Wall Time.
+  // Then use .getUTCDate() (or .toISOString) to ensure stability.
+  // Actually, easiest way is to mock the date passed to helper.
+  // Let's modify the helper call or make a simple object.
+  // But checking helper `utils/date-helper.ts`:
+  // export function getVotingPeriodStatus(now = new Date(), ...) { const day = now.getDate(); ... }
+  // We should probably just pass the day number to valid logic internally. 
+  // But for minimal invasion, let's just make a Date that returns the correct Day for .getDate().
+  // We can pass `shiftedTime` if we trust the server is UTC.
+  // Better: Let's assume the helper uses local time.
+  // We can just construct `new Date(currentYear, currentMonth - 1, currentDay)`.
+  // This constructs a date at Local 00:00 of that day. .getDate() will be correct.
+  
+  const checkDateCtx = new Date(currentYear, currentMonth - 1, currentDay)
+  
   // 3. Determine Expected Status
-  const status = getVotingPeriodStatus(checkDate, settings.autoVoteStartDay, settings.autoVoteEndDay)
-  results.push(`[System] Check Date: ${checkDate.getDate()} (Taipei), Target Status: ${status}`)
+  const status = getVotingPeriodStatus(checkDateCtx, settings.autoVoteStartDay, settings.autoVoteEndDay)
+  results.push(`[System] Check Date (TPE): ${currentYear}/${currentMonth}/${currentDay}, Target Status: ${status}`)
 
   // 4. Check Current DB Status
   let targetMonthForId = currentMonth + 1
   let targetYearForId = currentYear
 
-  const start = settings.autoVoteStartDay
+  // const start = settings.autoVoteStartDay
   const end = settings.autoVoteEndDay
-  const currentDay = checkDate.getDate()
-
+  // const currentDay = checkDate.getDate() -> We already have currentDay
+  
   // Cross-month logic
-  if (start > end && currentDay <= end) {
+  if (settings.autoVoteStartDay > end && currentDay <= end) {
     targetMonthForId = currentMonth
   }
 
