@@ -72,6 +72,11 @@ export async function runDailyCron() {
   const scheduleData = scheduleSnap.exists ? scheduleSnap.data() : null
 
   const currentStatus = scheduleData?.status // 'open' | 'closed' | undefined
+  
+  // DEBUG LOG
+  results.push(`[Debug] Checking ID: ${scheduleId}`)
+  results.push(`[Debug] DB Status: '${currentStatus}' (Type: ${typeof currentStatus})`)
+  results.push(`[Debug] Target Status: '${status}'`)
 
   // 5. Compare and Act
   if (status === 'OPEN' && currentStatus !== 'open') {
@@ -106,7 +111,7 @@ export async function runDailyCron() {
       console.error(`Failed to push to ${realTargetId}`, e)
       results.push(`[${groupId}] OPENED (Push Failed)`)
     }
-
+  } else if (status === 'CLOSED' && currentStatus === 'open') {
     // ACTION: CLOSE VOTING & ANNOUNCE
     interface VoteInfo { date: string, count: number, participants: string[] }
     const candidates: VoteInfo[] = []
@@ -190,7 +195,7 @@ export async function runDailyCron() {
       results.push(`[${groupId}] CLOSED (Push Failed)`)
     }
   } else {
-    results.push(`[${groupId}] No change (Status: ${currentStatus || 'new'}, Need: ${status})`)
+    results.push(`[${groupId}] No change (Target: '${status}', Current: '${currentStatus}')`)
   }
 
   return {
