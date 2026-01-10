@@ -3,6 +3,11 @@ interface BaseEventData {
   messageType: 'voting_open' | 'voting_closure' | 'event_announcement'
 }
 
+interface Participant {
+  name: string
+  avatar?: string
+}
+
 interface VotingOpenData extends BaseEventData {
   messageType: 'voting_open'
   openVoting?: boolean
@@ -11,7 +16,7 @@ interface VotingOpenData extends BaseEventData {
 
 interface VotingClosureData extends BaseEventData {
   messageType: 'voting_closure'
-  topDates: any[]
+  topDates: { date: string, count: number, participants: Participant[] }[]
 }
 
 interface EventAnnouncementData extends BaseEventData {
@@ -20,6 +25,31 @@ interface EventAnnouncementData extends BaseEventData {
 }
 
 export type PushEventData = VotingOpenData | VotingClosureData | EventAnnouncementData
+
+// Helper to render user rows
+const renderParticipantRows = (participants: any[] | string) => {
+  if (typeof participants === 'string') {
+    return [{ type: 'text', text: participants, size: 'sm', color: '#4B5563', wrap: true }]
+  }
+  if (Array.isArray(participants)) {
+     return participants.map((p: any) => {
+         const name = typeof p === 'string' ? p : p.name
+         const avatar = typeof p === 'string' ? null : p.avatar
+         
+         return {
+             type: 'box',
+             layout: 'baseline',
+             spacing: 'sm',
+             margin: 'xs',
+             contents: [
+                 ...(avatar ? [{ type: 'icon', url: avatar, size: 'xs' }] : []),
+                 { type: 'text', text: name, size: 'sm', color: '#4B5563', flex: 1, wrap: true }
+             ]
+         }
+     })
+  }
+  return []
+}
 
 export const buildPushMessages = (eventData: PushEventData) => {
   let messages: any[] = []
@@ -83,8 +113,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
     const rankedRows = events.map((event: any, index: number) => {
       const count = event.count || event.countO || 0
       const isWinner = index === 0
-      const participantsStr = Array.isArray(event.participants) ? event.participants.join('、') : (event.participants || '')
-
+      
       return {
         type: 'box',
         layout: 'vertical', // Vertical container for each result
@@ -117,12 +146,10 @@ export const buildPushMessages = (eventData: PushEventData) => {
           },
           // Row 2: Participants
           {
-            type: 'text',
-            text: participantsStr,
-            size: 'sm',
-            color: '#6B7280',
-            wrap: true,
-            margin: 'xs'
+            type: 'box',
+            layout: 'vertical',
+             // Only add margin if we have participants
+            contents: renderParticipantRows(event.participants)
           }
         ]
       }
@@ -226,12 +253,17 @@ export const buildPushMessages = (eventData: PushEventData) => {
         })
 
         // Participants
-        if (e.participants) {
+        if (e.participants && (Array.isArray(e.participants) ? e.participants.length > 0 : !!e.participants)) {
           detailContents.push({
-            type: 'box', layout: 'baseline', spacing: 'sm', margin: 'md',
+            type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'md',
             contents: [
               { type: 'text', text: '人員', color: '#9CA3AF', size: 'sm', flex: 1 },
-              { type: 'text', text: e.participants, weight: 'bold', color: '#4B5563', size: 'md', flex: 4, wrap: true }
+              { 
+                  type: 'box', 
+                  layout: 'vertical', 
+                  flex: 4,
+                  contents: renderParticipantRows(e.participants)
+              }
             ]
           })
         }

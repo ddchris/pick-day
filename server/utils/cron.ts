@@ -73,11 +73,6 @@ export async function runDailyCron() {
 
   const currentStatus = scheduleData?.status // 'open' | 'closed' | undefined
   
-  // DEBUG LOG
-  results.push(`[Debug] Checking ID: ${scheduleId}`)
-  results.push(`[Debug] DB Status: '${currentStatus}' (Type: ${typeof currentStatus})`)
-  results.push(`[Debug] Target Status: '${status}'`)
-
   // 5. Compare and Act
   if (status === 'OPEN' && currentStatus !== 'open') {
     // ACTION: OPEN VOTING
@@ -164,13 +159,21 @@ export async function runDailyCron() {
 
     // Resolve Names
     for (const cand of top2) {
-      const names: string[] = []
-      for (const uid of cand.participants) {
+      const members: { name: string; avatar: string }[] = []
+      // cand.participants is currently string[] (userIds) from the collection fetch above
+      for (const uid of (cand.participants as unknown as string[])) {
         const userSnap = await db.collection('users').doc(uid).get()
-        if (userSnap.exists) names.push(userSnap.data()?.displayName || '未知')
-        else names.push('未知')
+        if (userSnap.exists) {
+          const uData = userSnap.data()
+          members.push({
+            name: uData?.displayName || '未知',
+            avatar: uData?.pictureUrl || ''
+          })
+        } else {
+          members.push({ name: '未知', avatar: '' })
+        }
       }
-      cand.participants = names
+      cand.participants = members as any
     }
 
     // Update DB

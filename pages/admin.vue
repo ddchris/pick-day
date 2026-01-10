@@ -626,19 +626,22 @@ const announceEvents = async () => {
             const userIds = votes?.o_users || []
             
             // Resolve names
-            const names: string[] = []
+            const members: { name: string, avatar: string }[] = []
             if (userIds.length > 0) {
                 const userDocs = await Promise.all(userIds.map(uid => getDoc(doc(db, 'users', uid))))
-                names.push(...userDocs.map(snap => {
-                    if (snap.exists()) return snap.data().displayName || '未知'
-                    return '未知' // Fallback
+                members.push(...userDocs.map(snap => {
+                    if (snap.exists()) {
+                        const d = snap.data()
+                        return { name: d.displayName || '未知', avatar: d.pictureUrl || '' }
+                    }
+                    return { name: '未知', avatar: '' } // Fallback
                 }))
             }
 
             return {
                 date: d.dateStr,
                 dayName: d.dayName,
-                participants: names.join('、'), // Join for display
+                participants: members, // Pass structured data
                 participantCount: userIds.length,
                 ...forms[d.dateStr]
             }
