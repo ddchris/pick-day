@@ -319,7 +319,10 @@ export const buildPushMessages = (eventData: PushEventData) => {
           layout: 'vertical',
           backgroundColor: '#0D9488',
           cornerRadius: 'sm',
-          paddingAll: 'xs',
+          paddingTop: '10px',
+          paddingBottom: '10px',
+          paddingStart: 'md',
+          paddingEnd: 'md',
           margin: 'xs',
           contents: [
             { type: 'text', text: t, size: 'xs', color: '#ffffff', align: 'center' }
