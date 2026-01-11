@@ -38,12 +38,20 @@ const renderParticipantRows = (participants: any[] | string) => {
          
          return {
              type: 'box',
-             layout: 'baseline',
+             layout: 'horizontal',
              spacing: 'sm',
              margin: 'xs',
              contents: [
-                 ...(avatar ? [{ type: 'icon', url: avatar, size: 'xs' }] : []),
-                 { type: 'text', text: name, size: 'sm', color: '#4B5563', flex: 1, wrap: true }
+                 ...(avatar ? [{ 
+                     type: 'image', 
+                     url: avatar, 
+                     width: '18px',
+                     height: '18px',
+                     aspectMode: 'cover',
+                     cornerRadius: '18px',
+                     gravity: 'center'
+                 }] : []),
+                 { type: 'text', text: name, size: 'sm', color: '#4B5563', flex: 1, wrap: true, gravity: 'center' }
              ]
          }
      })
@@ -69,6 +77,8 @@ export const buildPushMessages = (eventData: PushEventData) => {
           type: 'box',
           layout: 'vertical',
           backgroundColor: '#0D9488', // Teal
+          paddingTop: '10px',
+          paddingBottom: '10px',
           contents: [
             { type: 'text', text: `📅 ${month} 挑日子開始！`, weight: 'bold', color: '#FFFFFF', size: 'lg' }
           ]
@@ -165,6 +175,8 @@ export const buildPushMessages = (eventData: PushEventData) => {
           type: 'box',
           layout: 'vertical',
           backgroundColor: '#F59E0B', // Amber/Gold
+          paddingTop: '10px',
+          paddingBottom: '10px',
           contents: [
             { type: 'text', text: '🏆 投票截止！', weight: 'bold', color: '#FFFFFF', size: 'lg' }
           ]
