@@ -49,7 +49,8 @@ const renderParticipantRows = (participants: any[] | string) => {
                      height: '18px',
                      aspectMode: 'cover',
                      cornerRadius: '18px',
-                     gravity: 'center'
+                     gravity: 'center',
+                     flex: 0
                  }] : []),
                  { type: 'text', text: name, size: 'sm', color: '#4B5563', flex: 1, wrap: true, gravity: 'center' }
              ]
