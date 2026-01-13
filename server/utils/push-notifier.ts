@@ -45,8 +45,8 @@ const renderParticipantRows = (participants: any[] | string) => {
                  ...(avatar ? [{ 
                      type: 'image', 
                      url: avatar, 
-                     width: '18px',
-                     height: '18px',
+                     size: '18px',
+                     aspectRatio: '1:1',
                      aspectMode: 'cover',
                      cornerRadius: '18px',
                      gravity: 'center',
