@@ -54,9 +54,11 @@ export default defineEventHandler(async (event) => {
       console.log(JSON.stringify(messages, null, 2))
       console.log('-----------------------')
 
+      const errorMessage = error.originalError?.response?.data?.message || error.statusMessage || 'LINE Push Failed'
+      
       throw createError({
         statusCode: error.statusCode || 500,
-        statusMessage: 'LINE Push Failed'
+        statusMessage: errorMessage
       })
     }
   } catch (error: any) {

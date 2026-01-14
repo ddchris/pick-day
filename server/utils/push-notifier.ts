@@ -29,12 +29,13 @@ export type PushEventData = VotingOpenData | VotingClosureData | EventAnnounceme
 // Helper to render user rows
 const renderParticipantRows = (participants: any[] | string) => {
   if (typeof participants === 'string') {
-    return [{ type: 'text', text: participants, size: 'sm', color: '#4B5563', wrap: true }]
+    return [{ type: 'text', text: participants || ' ', size: 'sm', color: '#4B5563', wrap: true }]
   }
   if (Array.isArray(participants)) {
      return participants.map((p: any) => {
-         const name = typeof p === 'string' ? p : p.name
-         const avatar = typeof p === 'string' ? null : p.avatar
+         const name = typeof p === 'string' ? p : (p.name || '未知')
+         const rawAvatar = typeof p === 'string' ? null : p.avatar
+         const avatar = (rawAvatar && rawAvatar.startsWith('https://')) ? rawAvatar : null
          
          return {
              type: 'box',
@@ -78,7 +79,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
           type: 'box',
           layout: 'vertical',
           backgroundColor: '#0D9488', // Teal
-          paddingTop: '10px',
+          paddingTop: '10px', // Header supports px well
           paddingBottom: '10px',
           contents: [
             { type: 'text', text: `📅 ${month} 挑日子開始！`, weight: 'bold', color: '#FFFFFF', size: 'lg' }
@@ -124,6 +125,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
     const rankedRows = events.map((event: any, index: number) => {
       const count = event.count || event.countO || 0
       const isWinner = index === 0
+      const dateText = event.date || '未知日期'
       
       return {
         type: 'box',
@@ -138,7 +140,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
             contents: [
               {
                 type: 'text',
-                text: event.date, // Date as main title
+                text: dateText, // Date as main title
                 weight: 'bold',
                 size: isWinner ? 'xl' : 'lg',
                 color: isWinner ? '#D97706' : '#1F2937',
@@ -223,6 +225,9 @@ export const buildPushMessages = (eventData: PushEventData) => {
         const types = Array.isArray(e.types) ? e.types : []
         const hasPayment = e.paymentInfo && e.cost !== '0' && e.cost !== ''
         const hasRemarks = !!e.remarks
+        
+        // Ensure date info
+        const displayDate = e.date ? `${e.date} ${e.dayName || ''}`.trim() : '日期待定'
 
         // Detail Rows
         const detailContents: any[] = []
@@ -233,7 +238,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
             type: 'box', layout: 'baseline', spacing: 'sm',
             contents: [
               { type: 'text', text: '活動', color: '#9CA3AF', size: 'sm', flex: 1 },
-              { type: 'text', text: types.join('、'), weight: 'bold', color: '#4B5563', size: 'md', flex: 4, wrap: true }
+              { type: 'text', text: types.join('、') || '無', weight: 'bold', color: '#4B5563', size: 'md', flex: 4, wrap: true }
             ]
           })
         }
@@ -314,19 +319,19 @@ export const buildPushMessages = (eventData: PushEventData) => {
           bodyContents.push({ type: 'text', text: ' ' })
         }
 
-        // Tags Logic: Fix invalid Text properties
+        // Tags Logic: User safer padding
         const tagContents = types.slice(0, 3).map((t: string) => ({
           type: 'box',
           layout: 'vertical',
           backgroundColor: '#0D9488',
           cornerRadius: 'sm',
-          paddingTop: '10px',
-          paddingBottom: '10px',
+          paddingTop: 'sm', // Changed from 10px to sm for better compatibility
+          paddingBottom: 'sm',
           paddingStart: 'md',
           paddingEnd: 'md',
           margin: 'xs',
           contents: [
-            { type: 'text', text: t, size: 'xs', color: '#ffffff', align: 'center' }
+            { type: 'text', text: t || ' ', size: 'xs', color: '#ffffff', align: 'center' }
           ]
         }))
 
@@ -338,13 +343,13 @@ export const buildPushMessages = (eventData: PushEventData) => {
             layout: 'vertical',
             contents: [
               { type: 'text', text: '📅 本月活動定案', weight: 'bold', color: '#1F2937', size: 'xs' },
-              { type: 'text', text: `${e.date} ${e.dayName}`, weight: 'bold', size: 'xl', margin: 'md', color: '#0D9488' },
-              {
+              { type: 'text', text: displayDate, weight: 'bold', size: 'xl', margin: 'md', color: '#0D9488' },
+              ...(tagContents.length > 0 ? [{
                 type: 'box',
                 layout: 'horizontal',
-                contents: tagContents.length > 0 ? tagContents : [{ type: 'spacer' }],
+                contents: tagContents,
                 margin: 'md'
-              }
+              }] : [])
             ],
             paddingBottom: 'none'
           },
