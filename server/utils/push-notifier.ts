@@ -53,6 +53,7 @@ const renderParticipantRows = (participants: any[] | string) => {
              spacing: 'sm',
              margin: 'xs',
              contents: [
+                 ...(avatar ? [{ 
                      type: 'image', 
                      url: avatar, 
                      size: '18px',
@@ -307,7 +308,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
         // Optional: Payment Info
         if (hasPayment) {
           bodyContents.push({
-            type: 'box', layout: 'vertical', margin: 'lg', backgroundColor: '#F3F4F6', cornerRadius: 'md', paddingAll: 'md',
+            type: 'box', layout: 'vertical', margin: 'lg', backgroundColor: '#F3F4F6', paddingAll: 'md',
             contents: [
               { type: 'text', text: '匯款資訊', size: 'xs', color: '#6B7280', weight: 'bold' },
               { type: 'text', text: e.paymentInfo, size: 'md', color: '#374151', wrap: true, margin: 'xs' }
@@ -340,7 +341,6 @@ export const buildPushMessages = (eventData: PushEventData) => {
           type: 'box',
           layout: 'vertical',
           backgroundColor: '#0D9488',
-          cornerRadius: 'sm',
           paddingAll: 'xs', // Use simple paddingAll
           margin: 'sm', // Margin is between items in horizontal layout
           contents: [
