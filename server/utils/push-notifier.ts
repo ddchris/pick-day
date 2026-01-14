@@ -302,8 +302,8 @@ export const buildPushMessages = (eventData: PushEventData) => {
 
         // Body Contents Assembly
         const bodyContents: any[] = [
-          { type: 'separator', color: '#E5E7EB' },
-          { type: 'box', layout: 'vertical', margin: 'lg', spacing: 'sm', contents: detailContents }
+          // Separator at index 0 is invalid in Flex Message Body
+          { type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm', contents: detailContents }
         ]
 
         // Optional: Payment Info
