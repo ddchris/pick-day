@@ -664,8 +664,15 @@ const announceEvents = async () => {
         }
     } catch (e: any) {
         console.error(e)
-        const serverMsg = e.response?._data?.statusMessage || e.message
-        alert('發送失敗: ' + serverMsg)
+        // detailed message is usually in _data.message for createError
+        const data = e.response?._data
+        let serverMsg = data?.message || data?.statusMessage || e.message
+        
+        if (typeof serverMsg === 'object') {
+            serverMsg = JSON.stringify(serverMsg, null, 2)
+        }
+        
+        alert('發送失敗:\n' + serverMsg)
     } finally {
         saving.value = false
     }

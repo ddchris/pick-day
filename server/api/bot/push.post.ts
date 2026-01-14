@@ -74,18 +74,15 @@ export default defineEventHandler(async (event) => {
 
       const finalMessage = errorDetail || (
         typeof error === 'object' 
-          ? JSON.stringify({ 
-              statusCode: error.statusCode, 
-              statusMessage: error.statusMessage, 
-              msg: error.message,
-              original: error.originalError 
-            }) 
+          ? `LINE Error: ${error.statusCode || 'Unknown'} - ${error.statusMessage || error.message || ''} ${errorDetail ? `Details: ${errorDetail}` : ''}`
           : String(error)
       )
       
+      // Use 'message' field which goes into the body, as 'statusMessage' (HTTP Status Text) has length/char limits
       throw createError({
         statusCode: error.statusCode || 500,
-        statusMessage: finalMessage 
+        statusMessage: 'Push Failed', // Short, valid HTTP status text
+        message: finalMessage // Long detailed description
       })
     }
   } catch (error: any) {

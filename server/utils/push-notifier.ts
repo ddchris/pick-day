@@ -302,8 +302,8 @@ export const buildPushMessages = (eventData: PushEventData) => {
 
         // Body Contents Assembly
         const bodyContents: any[] = [
-          // Separator at index 0 is invalid in Flex Message Body
-          { type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm', contents: detailContents }
+          // Remove margin from first item to be safe
+          { type: 'box', layout: 'vertical', spacing: 'sm', contents: detailContents }
         ]
 
         // Optional: Payment Info
@@ -336,19 +336,17 @@ export const buildPushMessages = (eventData: PushEventData) => {
         // Ensure date info
         const displayDate = e.date ? `${e.date} ${e.dayName || ''}`.trim() : '日期待定'
 
-        // Tags Logic: User safer padding
+        // Tags Logic: Simplified to pass validation
+        // Remove complex padding/margin for now. Rely on box sizing.
         const tagContents = types.slice(0, 3).map((t: string) => ({
           type: 'box',
           layout: 'vertical',
           backgroundColor: '#0D9488',
           cornerRadius: 'sm',
-          paddingTop: 'sm', 
-          paddingBottom: 'sm',
-          paddingStart: 'md',
-          paddingEnd: 'md',
-          margin: 'xs',
+          paddingAll: 'xs', // Use simple paddingAll
+          margin: 'sm', // Margin is between items in horizontal layout
           contents: [
-            { type: 'text', text: t || ' ', size: 'xs', color: '#ffffff', align: 'center' }
+            { type: 'text', text: t || ' ', size: 'xs', color: '#ffffff', align: 'center', wrap: false }
           ]
         }))
 
@@ -365,7 +363,8 @@ export const buildPushMessages = (eventData: PushEventData) => {
                 type: 'box',
                 layout: 'horizontal',
                 contents: tagContents,
-                margin: 'md'
+                margin: 'md',
+                spacing: 'xs' // Add spacing container
               }] : [])
             ],
             paddingBottom: 'none'
