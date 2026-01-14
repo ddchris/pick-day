@@ -78,10 +78,10 @@ export default defineEventHandler(async (event) => {
       throw createError({
         statusCode: 500, // Force 500 to ensure client sees it as error
         statusMessage: 'Push Failed',
-        message: {
+        message: JSON.stringify({
            error: errorDump,
            payload: payloadDump
-        } as any // Cast to any to bypass type check for now
+        }, null, 2)
       })
     }
   } catch (error: any) {

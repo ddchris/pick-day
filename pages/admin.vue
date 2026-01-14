@@ -668,6 +668,7 @@ const announceEvents = async () => {
         const data = e.response?._data
         let serverMsg = data?.message || data?.statusMessage || e.message
         
+        // If it's an object, stringify it
         if (typeof serverMsg === 'object') {
             serverMsg = JSON.stringify(serverMsg, null, 2)
         }
