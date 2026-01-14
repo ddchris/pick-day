@@ -63,10 +63,12 @@ export default defineEventHandler(async (event) => {
       }
       
       if (error.response) errorDump.response = error.response
+      if (error.body) errorDump.body = error.body // Critical: Capture the body based on screenshot evidence
       if (error.originalError) {
           errorDump.originalError = {
               message: error.originalError.message,
-              response_data: error.originalError.response?.data
+              response_data: error.originalError.response?.data,
+              body: (error.originalError as any).body // Check here too
           }
       }
       if (error.statusCode) errorDump.statusCode = error.statusCode

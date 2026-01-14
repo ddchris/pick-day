@@ -238,7 +238,28 @@
                <div class="i-carbon-bullhorn"></div>
                公佈結果 (Bot)
            </button>
-       </div>
+           <div class="text-sm text-gray-500 mt-2">
+            當前設定群組: {{ groupProfile?.groupName || '未設定' }}
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div v-if="showError" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b flex justify-between items-center bg-red-50 rounded-t-lg">
+                <h3 class="font-bold text-red-700">發送失敗 (Debug Info)</h3>
+                <button @click="showError = false" class="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1 bg-gray-50">
+                <pre class="text-xs text-gray-700 whitespace-pre-wrap break-all font-mono">{{ errorContent }}</pre>
+            </div>
+            <div class="p-4 border-t flex justify-end gap-2 bg-white rounded-b-lg">
+                <button @click="showError = false" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-md">關閉</button>
+                <button @click="copyError" class="px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-700 flex items-center gap-2">
+                    <span>📋</span> 複製完整錯誤訊息
+                </button>
+            </div>
+        </div>
     </div>
   </div>
 </template>
@@ -673,12 +694,39 @@ const announceEvents = async () => {
             serverMsg = JSON.stringify(serverMsg, null, 2)
         }
         
-        alert('發送失敗:\n' + serverMsg)
+        errorContent.value = serverMsg
+        showError.value = true
     } finally {
         saving.value = false
     }
 }
+
+// Error Modal Logic
+const showError = ref(false)
+const errorContent = ref('')
+
+const copyError = async () => {
+    try {
+        await navigator.clipboard.writeText(errorContent.value)
+        alert('已複製到剪貼簿')
+    } catch (err) {
+        console.error('Copy failed', err)
+        alert('複製失敗，請手動複製')
+    }
+}
 </script>
+
+<template>
+  <div class="container mx-auto px-4 py-8 max-w-2xl">
+    <!-- ... existing template content ... -->
+    <!-- I need to inject the modal at the root of the template, but I can't overwrite the whole file nicely. -->
+    <!-- Strategy: I will append the modal markup to the end of the template in a separate edit or try to find a safe insertion point. -->
+    <!-- Wait, I am in the <script> block here. I need to close script and start template if I were replacing more. -->
+    <!-- The user's file structure is <script setup> then <template>. -->
+    <!-- I will split this into two edits: 1. Add state/logic in script. 2. Add UI in template. -->
+    <!-- This replace_file_content corresponds to the Script logic. -->
+  </div>
+</template>
 
 <style scoped>
 /* Slight fade in for items */
