@@ -16,7 +16,16 @@ export default defineEventHandler(async (event) => {
   const token = config.lineChannelAccessToken
 
   // --- Message Generation Logic ---
-  const messages = buildPushMessages(eventData)
+  let messages;
+  try {
+    messages = buildPushMessages(eventData)
+  } catch (e: any) {
+    console.error('Message Build Error:', e)
+    throw createError({
+      statusCode: 400,
+      statusMessage: `Message Build Failed: ${e.message}`
+    })
+  }
 
   // --- Sending Logic ---
 
@@ -45,27 +54,39 @@ export default defineEventHandler(async (event) => {
       return { success: true }
     } catch (error: any) {
       console.error('LINE Push Error:', error.statusCode, '-', error.statusMessage)
-      // Detailed error logging
+      
+      let errorDetail = ''
       if (error.originalError && error.originalError.response) {
         console.error('Response Data:', error.originalError.response.data)
+        const data = error.originalError.response.data
+        if (data) {
+             errorDetail = data.message || ''
+             if (data.details && Array.isArray(data.details)) {
+                 errorDetail += ' : ' + data.details.map((d: any) => `${d.property} ${d.message}`).join(', ')
+             }
+        }
       }
+      
       // Critical: Log the actual failing payload
       console.log('--- FAILING PAYLOAD ---')
       console.log(JSON.stringify(messages, null, 2))
       console.log('-----------------------')
 
-      const errorMessage = error.originalError?.response?.data?.message || error.statusMessage || 'LINE Push Failed'
+      const finalMessage = errorDetail || error.statusMessage || 'LINE Push Failed'
       
       throw createError({
         statusCode: error.statusCode || 500,
-        statusMessage: errorMessage
+        statusMessage: finalMessage
       })
     }
   } catch (error: any) {
+    // If it's already a H3Error (from inner catch), rethrow
+    if (error.statusCode) throw error
+    
     console.error('LINE Push Client Initialization Error:', error)
     throw createError({
       statusCode: 500,
-      statusMessage: 'LINE Push Client Initialization Failed: ' + (error.message || 'Unknown error'),
+      statusMessage: 'Client Init Failed: ' + (error.message || 'Unknown error'),
     })
   }
 })
