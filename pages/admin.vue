@@ -260,6 +260,7 @@
                 </button>
             </div>
         </div>
+        </div>
     </div>
   </div>
 </template>
@@ -716,17 +717,7 @@ const copyError = async () => {
 }
 </script>
 
-<template>
-  <div class="container mx-auto px-4 py-8 max-w-2xl">
-    <!-- ... existing template content ... -->
-    <!-- I need to inject the modal at the root of the template, but I can't overwrite the whole file nicely. -->
-    <!-- Strategy: I will append the modal markup to the end of the template in a separate edit or try to find a safe insertion point. -->
-    <!-- Wait, I am in the <script> block here. I need to close script and start template if I were replacing more. -->
-    <!-- The user's file structure is <script setup> then <template>. -->
-    <!-- I will split this into two edits: 1. Add state/logic in script. 2. Add UI in template. -->
-    <!-- This replace_file_content corresponds to the Script logic. -->
-  </div>
-</template>
+
 
 <style scoped>
 /* Slight fade in for items */
