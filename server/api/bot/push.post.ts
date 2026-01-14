@@ -72,11 +72,20 @@ export default defineEventHandler(async (event) => {
       console.log(JSON.stringify(messages, null, 2))
       console.log('-----------------------')
 
-      const finalMessage = errorDetail || error.statusMessage || 'LINE Push Failed'
+      const finalMessage = errorDetail || (
+        typeof error === 'object' 
+          ? JSON.stringify({ 
+              statusCode: error.statusCode, 
+              statusMessage: error.statusMessage, 
+              msg: error.message,
+              original: error.originalError 
+            }) 
+          : String(error)
+      )
       
       throw createError({
         statusCode: error.statusCode || 500,
-        statusMessage: finalMessage
+        statusMessage: finalMessage 
       })
     }
   } catch (error: any) {

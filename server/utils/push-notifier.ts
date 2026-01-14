@@ -29,11 +29,21 @@ export type PushEventData = VotingOpenData | VotingClosureData | EventAnnounceme
 // Helper to render user rows
 const renderParticipantRows = (participants: any[] | string) => {
   if (typeof participants === 'string') {
-    return [{ type: 'text', text: participants || ' ', size: 'sm', color: '#4B5563', wrap: true }]
+    const text = participants || ' ' // Prevent empty string
+    return [{ type: 'text', text: text, size: 'sm', color: '#4B5563', wrap: true }]
   }
   if (Array.isArray(participants)) {
-     return participants.map((p: any) => {
-         const name = typeof p === 'string' ? p : (p.name || '未知')
+     // Filter out invalid items first
+     const validParticipants = participants.filter(p => !!p)
+     
+     if (validParticipants.length === 0) {
+        return [{ type: 'text', text: '無', size: 'sm', color: '#9CA3AF' }]
+     }
+
+     return validParticipants.map((p: any) => {
+         let name = typeof p === 'string' ? p : (p.name || '')
+         if (!name.trim()) name = '未知'
+         
          const rawAvatar = typeof p === 'string' ? null : p.avatar
          const avatar = (rawAvatar && rawAvatar.startsWith('https://')) ? rawAvatar : null
          
@@ -58,7 +68,7 @@ const renderParticipantRows = (participants: any[] | string) => {
          }
      })
   }
-  return []
+  return [{ type: 'text', text: ' ', size: 'sm' }] // Fallback for invalid type
 }
 
 export const buildPushMessages = (eventData: PushEventData) => {
@@ -79,7 +89,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
           type: 'box',
           layout: 'vertical',
           backgroundColor: '#0D9488', // Teal
-          paddingTop: '10px', // Header supports px well
+          paddingTop: '10px',
           paddingBottom: '10px',
           contents: [
             { type: 'text', text: `📅 ${month} 挑日子開始！`, weight: 'bold', color: '#FFFFFF', size: 'lg' }
@@ -127,6 +137,8 @@ export const buildPushMessages = (eventData: PushEventData) => {
       const isWinner = index === 0
       const dateText = event.date || '未知日期'
       
+      const pRows = renderParticipantRows(event.participants)
+
       return {
         type: 'box',
         layout: 'vertical', // Vertical container for each result
@@ -162,7 +174,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
             type: 'box',
             layout: 'vertical',
              // Only add margin if we have participants
-            contents: renderParticipantRows(event.participants)
+            contents: pRows.length > 0 ? pRows : [{ type: 'text', text: ' ', size: 'xxs' }] 
           }
         ]
       }
@@ -225,9 +237,6 @@ export const buildPushMessages = (eventData: PushEventData) => {
         const types = Array.isArray(e.types) ? e.types : []
         const hasPayment = e.paymentInfo && e.cost !== '0' && e.cost !== ''
         const hasRemarks = !!e.remarks
-        
-        // Ensure date info
-        const displayDate = e.date ? `${e.date} ${e.dayName || ''}`.trim() : '日期待定'
 
         // Detail Rows
         const detailContents: any[] = []
@@ -271,19 +280,24 @@ export const buildPushMessages = (eventData: PushEventData) => {
         })
 
         // Participants
-        if (e.participants && (Array.isArray(e.participants) ? e.participants.length > 0 : !!e.participants)) {
-          detailContents.push({
-            type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'md',
-            contents: [
-              { type: 'text', text: '人員', color: '#9CA3AF', size: 'sm', flex: 1 },
-              { 
-                  type: 'box', 
-                  layout: 'vertical', 
-                  flex: 4,
-                  contents: renderParticipantRows(e.participants)
-              }
-            ]
-          })
+        const hasParticipants = e.participants && (Array.isArray(e.participants) ? e.participants.length > 0 : !!e.participants)
+        if (hasParticipants) {
+          const pRows = renderParticipantRows(e.participants)
+          // Double safety: if rows are empty (shouldn't happen with updated helper), don't push the section
+           if (pRows.length > 0) {
+              detailContents.push({
+                type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'md',
+                contents: [
+                  { type: 'text', text: '人員', color: '#9CA3AF', size: 'sm', flex: 1 },
+                  { 
+                      type: 'box', 
+                      layout: 'vertical', 
+                      flex: 4,
+                      contents: pRows
+                  }
+                ]
+              })
+           }
         }
 
         // Body Contents Assembly
@@ -314,10 +328,13 @@ export const buildPushMessages = (eventData: PushEventData) => {
           })
         }
 
-        // Safety: Ensure bodyContents is valid
+        // Safety: Ensure text in bodyContents is valid
         if (bodyContents.length === 0) {
           bodyContents.push({ type: 'text', text: ' ' })
         }
+        
+        // Ensure date info
+        const displayDate = e.date ? `${e.date} ${e.dayName || ''}`.trim() : '日期待定'
 
         // Tags Logic: User safer padding
         const tagContents = types.slice(0, 3).map((t: string) => ({
@@ -325,7 +342,7 @@ export const buildPushMessages = (eventData: PushEventData) => {
           layout: 'vertical',
           backgroundColor: '#0D9488',
           cornerRadius: 'sm',
-          paddingTop: 'sm', // Changed from 10px to sm for better compatibility
+          paddingTop: 'sm', 
           paddingBottom: 'sm',
           paddingStart: 'md',
           paddingEnd: 'md',
