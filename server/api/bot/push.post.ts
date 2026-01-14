@@ -53,36 +53,35 @@ export default defineEventHandler(async (event) => {
       console.log('[LINE Bot Push] ✅ Message sent successfully')
       return { success: true }
     } catch (error: any) {
-      console.error('LINE Push Error:', error.statusCode, '-', error.statusMessage)
+      console.error('LINE Push Error:', error)
       
-      let errorDetail = ''
-      if (error.originalError && error.originalError.response) {
-        console.error('Response Data:', error.originalError.response.data)
-        const data = error.originalError.response.data
-        if (data) {
-             errorDetail = data.message || ''
-             if (data.details && Array.isArray(data.details)) {
-                 errorDetail += ' : ' + data.details.map((d: any) => `${d.property} ${d.message}`).join(', ')
-             }
-        }
+      // Attempt to inspect the error object deeply
+      const errorDump: any = {
+        message: error.message,
+        stack: error.stack,
+        keys: Object.keys(error)
       }
       
-      // Critical: Log the actual failing payload
-      console.log('--- FAILING PAYLOAD ---')
-      console.log(JSON.stringify(messages, null, 2))
-      console.log('-----------------------')
+      if (error.response) errorDump.response = error.response
+      if (error.originalError) {
+          errorDump.originalError = {
+              message: error.originalError.message,
+              response_data: error.originalError.response?.data
+          }
+      }
+      if (error.statusCode) errorDump.statusCode = error.statusCode
+      if (error.statusMessage) errorDump.statusMessage = error.statusMessage
 
-      const finalMessage = errorDetail || (
-        typeof error === 'object' 
-          ? `LINE Error: ${error.statusCode || 'Unknown'} - ${error.statusMessage || error.message || ''} ${errorDetail ? `Details: ${errorDetail}` : ''}`
-          : String(error)
-      )
+      // Serialize carefully
+      const payloadDump = JSON.parse(JSON.stringify(messages))
       
-      // Use 'message' field which goes into the body, as 'statusMessage' (HTTP Status Text) has length/char limits
       throw createError({
-        statusCode: error.statusCode || 500,
-        statusMessage: 'Push Failed', // Short, valid HTTP status text
-        message: finalMessage // Long detailed description
+        statusCode: 500, // Force 500 to ensure client sees it as error
+        statusMessage: 'Push Failed',
+        message: {
+           error: errorDump,
+           payload: payloadDump
+        } as any // Cast to any to bypass type check for now
       })
     }
   } catch (error: any) {
