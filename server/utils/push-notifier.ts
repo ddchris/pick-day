@@ -53,13 +53,11 @@ const renderParticipantRows = (participants: any[] | string) => {
              spacing: 'sm',
              margin: 'xs',
              contents: [
-                 ...(avatar ? [{ 
                      type: 'image', 
                      url: avatar, 
                      size: '18px',
                      aspectRatio: '1:1',
                      aspectMode: 'cover',
-                     cornerRadius: '18px',
                      gravity: 'center',
                      flex: 0
                  }] : []),
