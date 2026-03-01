@@ -409,30 +409,52 @@ const simulateCloseAndSync = async () => {
     
     simulating.value = true
     try {
-        // 1. Calculate Top 2 with minimum 3 participants
-        const votes = scheduleStore.votes || {}
+        // 1. Calculate Top 2 with minimum 3 participants from dateVotes
+        const { db } = useNuxtApp().$firebase
+        const { doc, getDoc, updateDoc, collection, getDocs } = await import('firebase/firestore')
         
-        const sorted = Object.entries(votes).map(([date, data]) => ({
-            date,
-            count: data.o_users?.length || 0,  // Use o_users.length, not countO
-            participants: data.o_users || []
-        }))
+        // Fetch ALL votes for the target month from dateVotes
+        const currentMonthId = scheduleStore.currentMonthId || `${userStore.groupId}_${new Date().getFullYear()}${String(new Date().getMonth() + 2).padStart(2, '0')}`
+        const yearMonthPrefix = `${userStore.groupId}_${currentMonthId.split('_')[1]}`
+        
+        // Get all days in the month (approx. 1-31)
+        const checkRefs = []
+        const [year, month] = currentMonthId.split('_')[1].match(/.{1,4}/g) // gets 2026, 03
+        const yearInt = parseInt(year)
+        const monthInt = parseInt(month)
+        const daysInMonth = new Date(yearInt, monthInt, 0).getDate()
+        
+        for (let d = 1; d <= daysInMonth; d++) {
+           const dateStr = `${year}-${String(monthInt).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+           const voteId = `${userStore.groupId}_${dateStr.replace(/-/g, '')}`
+           checkRefs.push({ dateStr, ref: doc(db, 'dateVotes', voteId) })
+        }
+        
+        const snapshots = await Promise.all(checkRefs.map(item => getDoc(item.ref)))
+        
+        const sorted = snapshots.map((snap, i) => {
+           if (snap.exists()) {
+              const data = snap.data()
+              return {
+                 date: checkRefs[i].dateStr,
+                 count: data.o_users?.length || 0,
+                 participants: data.o_users || []
+              }
+           }
+           return { date: checkRefs[i].dateStr, count: 0, participants: [] }
+        })
         .filter(d => d.count >= 3) // Filter: minimum 3 participants
         .sort((a, b) => b.count - a.count)
         
         const top2 = sorted.slice(0, 2)
         
         if (top2.length === 0) {
-            alert('QQ，本月人數不夠，沒有成團')
-            simulating.value = false
-            return
+            console.log('[Dev Tools] No candidates found with >= 3 participants')
         }
         
         console.log('[Dev Tools] Top 2 dates:', top2)
         
-        // Get participant names from Firestore
-        const { db } = useNuxtApp().$firebase
-        const { doc, getDoc, updateDoc } = await import('firebase/firestore')
+        // 1.5 Get participant names from Firestore
         
         const topDatesWithNames = await Promise.all(top2.map(async (d) => {
           const participantNames = await Promise.all(
@@ -460,7 +482,6 @@ const simulateCloseAndSync = async () => {
         }
         
         // 3. Update Firestore (Admin Settings) - Keep for backwards compatibility
-        const currentMonthId = scheduleStore.currentMonthId || `${userStore.groupId}_${new Date().getFullYear()}-${String(new Date().getMonth() + 2).padStart(2, '0')}`
         const scheduleRef = doc(db, 'monthlySchedules', currentMonthId)
         
         await updateDoc(scheduleRef, {
@@ -468,7 +489,7 @@ const simulateCloseAndSync = async () => {
               type: '投票結果',
               location: '尚待決定',
               description: `【模擬截止結果】\\n${topDatesWithNames.map((d, i) => `第 ${i+1} 名: ${d.date} (${d.count}人)`).join('\\n')}\\n\\n請管理員確認最終細節。`,
-              timestamp: new Date(top2[0].date).getTime()
+              timestamp: top2.length > 0 ? new Date(top2[0].date).getTime() : Date.now()
             },
             status: 'closed',
             updatedAt: Date.now()
@@ -482,7 +503,7 @@ const simulateCloseAndSync = async () => {
                        type: '投票結果',
                        location: '尚待決定',
                        description: `【模擬截止結果】\\n${topDatesWithNames.map((d, i) => `第 ${i+1} 名: ${d.date} (${d.count}人)`).join('\\n')}`,
-                       timestamp: new Date(top2[0].date).getTime()
+                       timestamp: top2.length > 0 ? new Date(top2[0].date).getTime() : Date.now()
                      },
                      votes: {},
                      status: 'closed'
